@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OSRS Tools</title>
+<link rel="stylesheet" href="shared/theme.css">
+<style>
+  header.hub { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+  header.hub p { margin: 6px 0 0; max-width: 60ch; }
+  .tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .tool { display: flex; flex-direction: column; gap: 10px; }
+  .tool .top { display: flex; justify-content: space-between; align-items: start; gap: 8px; }
+  .tool p { margin: 0; color: var(--muted); }
+  .tool .meta { font-size: var(--step--1); color: var(--muted); }
+  .tool .actions { display: flex; gap: 8px; margin-top: auto; flex-wrap: wrap; }
+  .status-scaffold { color: var(--warn); }
+  .status-live { color: var(--up); }
+  .status-pending-import { color: var(--muted); }
+  .status-archived { color: var(--muted); }
+  footer { margin-top: 32px; font-size: var(--step--1); color: var(--muted); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="hub">
+    <div>
+      <span class="label">j0793</span>
+      <h1>OSRS Tools</h1>
+      <p class="muted">Personal Old School RuneScape tools. Each one has its own version and changelog.</p>
+    </div>
+    <a class="btn" href="changelog.html">Repo changelog</a>
+  </header>
+
+  <section class="tools" id="tools" aria-live="polite">
+    <p class="muted">Loading tools…</p>
+  </section>
+
+  <footer>Prices in the market analyzer come from the OSRS Wiki Real-time Prices API.</footer>
+</main>
+
+<script>
+  const STATUS_LABEL = { scaffold: "Scaffold", live: "Live", "pending-import": "Pending import", archived: "Archived" };
+
+  function card(t) {
+    const el = document.createElement("article");
+    el.className = "panel tool";
+    const ready = t.status !== "pending-import";
+    el.innerHTML = `
+      <div class="top">
+        <h3></h3>
+        <span class="chip status-${t.status}"></span>
+      </div>
+      <p></p>
+      <div class="meta mono"></div>
+      <div class="actions"></div>`;
+    el.querySelector("h3").textContent = t.name;
+    el.querySelector(".chip").textContent = STATUS_LABEL[t.status] || t.status;
+    el.querySelector("p").textContent = t.description;
+    el.querySelector(".meta").textContent = t.version ? `v${t.version} · updated ${t.updated}` : "Not imported yet";
+    const actions = el.querySelector(".actions");
+    if (ready) {
+      const open = document.createElement("a");
+      open.className = "btn primary"; open.href = t.path; open.textContent = "Open";
+      actions.append(open);
+    }
+    const log = document.createElement("a");
+    log.className = "btn"; log.href = `changelog.html?tool=${encodeURIComponent(t.id)}`; log.textContent = "Changelog";
+    actions.append(log);
+    return el;
+  }
+
+  fetch("tools.json")
+    .then(r => r.json())
+    .then(({ tools }) => {
+      const box = document.getElementById("tools");
+      box.replaceChildren(...tools.map(card));
+    })
+    .catch(() => {
+      document.getElementById("tools").innerHTML =
+        '<p class="muted">Could not load tools.json. Open this page through GitHub Pages or a local server, not as a file.</p>';
+    });
+</script>
+</body>
+</html>

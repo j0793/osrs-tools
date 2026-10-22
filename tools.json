@@ -1,0 +1,31 @@
+{
+  "tools": [
+    {
+      "id": "market-analyzer",
+      "name": "GE Market Analyzer",
+      "path": "market-analyzer/",
+      "status": "scaffold",
+      "version": "0.1.0",
+      "updated": "2026-10-22",
+      "description": "Screens Grand Exchange prices against update baselines, tracks positions and P/L after tax, and reviews trade theses."
+    },
+    {
+      "id": "ca-tracker",
+      "name": "Combat Achievements Tracker",
+      "path": "ca-tracker/",
+      "status": "pending-import",
+      "version": "",
+      "updated": "",
+      "description": "Tracks progress on combat achievement tasks. Waiting to be imported into this repo."
+    },
+    {
+      "id": "foundry-tracker",
+      "name": "Giants' Foundry Tracker",
+      "path": "foundry-tracker/",
+      "status": "pending-import",
+      "version": "",
+      "updated": "",
+      "description": "Giants' Foundry progress tracker. Waiting to be imported into this repo."
+    }
+  ]
+}

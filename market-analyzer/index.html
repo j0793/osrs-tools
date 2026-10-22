@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GE Market Analyzer</title>
+<link rel="stylesheet" href="../shared/theme.css">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../" title="All OSRS tools">
+      <span class="label">OSRS Tools</span>
+      <strong>GE Market Analyzer</strong>
+    </a>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#screener" data-tab="screener">Screener</a>
+      <a href="#baskets" data-tab="baskets">Baskets</a>
+      <a href="#portfolio" data-tab="portfolio">Portfolio</a>
+      <a href="#journal" data-tab="journal">Journal</a>
+      <a href="#events" data-tab="events">Events</a>
+      <a href="#settings" data-tab="settings">Settings</a>
+    </nav>
+  </div>
+  <div class="statusbar" id="status" role="status"></div>
+</header>
+
+<main class="wrap" id="view" aria-live="polite"></main>
+
+<datalist id="item-names"></datalist>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

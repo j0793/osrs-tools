@@ -1,0 +1,150 @@
+/* OSRS Tools — shared theme
+   Layout concept: a quiet stone-grey workbench; coin gold marks the one thing that matters on each screen.
+   Every tool in this repo links this file so the hub and the apps look like one set. */
+
+@import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+:root {
+  --bg: #e9edef;
+  --surface: #ffffff;
+  --surface-2: #f4f6f7;
+  --ink: #1a2025;
+  --muted: #5a6670;
+  --line: #d2d9dd;
+  --gold: #9a6a0a;
+  --gold-soft: #f5e9c8;
+  --up: #1d7448;
+  --down: #b0352b;
+  --warn: #9a6200;
+  --info: #2a5f8a;
+
+  --font-display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --radius: 6px;
+  --step--1: 0.8125rem;
+  --step-0: 0.9375rem;
+  --step-1: 1.125rem;
+  --step-2: 1.5rem;
+  --step-3: 2rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111518;
+    --surface: #191f24;
+    --surface-2: #20272d;
+    --ink: #e5e9ec;
+    --muted: #93a0a9;
+    --line: #2c353c;
+    --gold: #e2b24c;
+    --gold-soft: #3a3019;
+    --up: #4fc48d;
+    --down: #f07a6e;
+    --warn: #e6a640;
+    --info: #74aee0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111518;
+  --surface: #191f24;
+  --surface-2: #20272d;
+  --ink: #e5e9ec;
+  --muted: #93a0a9;
+  --line: #2c353c;
+  --gold: #e2b24c;
+  --gold-soft: #3a3019;
+  --up: #4fc48d;
+  --down: #f07a6e;
+  --warn: #e6a640;
+  --info: #74aee0;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.5;
+}
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: var(--step-3); font-weight: 700; }
+h2 { font-size: var(--step-2); font-weight: 600; }
+h3 { font-size: var(--step-1); font-weight: 600; }
+a { color: var(--info); }
+code, .mono, .num { font-family: var(--font-mono); }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.up { color: var(--up); }
+.down { color: var(--down); }
+.label {
+  font-size: var(--step--1);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+button, .btn {
+  font: inherit;
+  font-weight: 500;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+button:hover, .btn:hover { border-color: var(--gold); }
+button.primary, .btn.primary { background: var(--gold); border-color: var(--gold); color: var(--surface); }
+button:focus-visible, .btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+input, select, textarea {
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  min-width: 0;
+}
+
+.chip {
+  display: inline-block;
+  font-size: var(--step--1);
+  font-weight: 500;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

@@ -1,0 +1,92 @@
+/* GE Market Analyzer — app layout on top of ../shared/theme.css */
+
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 10; background: var(--surface);
+}
+.topbar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.topbar-inner {
+  max-width: 1200px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 10px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px;
+}
+.brand { display: flex; flex-direction: column; text-decoration: none; color: var(--ink); line-height: 1.2; }
+.brand strong { font-family: var(--font-display); font-size: var(--step-1); }
+.tabs { display: flex; gap: 2px; overflow-x: auto; max-width: 100%; }
+.tabs a {
+  text-decoration: none; color: var(--muted); padding: 6px 10px; border-radius: var(--radius);
+  font-weight: 500; white-space: nowrap;
+}
+.tabs a[aria-current="page"] { color: var(--ink); background: var(--gold-soft); }
+.statusbar {
+  max-width: 1200px; margin: 0 auto; font-size: var(--step--1); color: var(--muted);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 8px;
+}
+.statusbar .err { color: var(--down); }
+
+/* page sections */
+.view-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px; margin-bottom: 16px; }
+.view-head p { margin: 4px 0 0; color: var(--muted); max-width: 70ch; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.row > label { display: flex; flex-direction: column; gap: 2px; font-size: var(--step--1); color: var(--muted); }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.grid-2 > * { min-width: 0; }
+
+/* summary figures */
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.figure { display: flex; flex-direction: column; gap: 2px; }
+.figure .v { font-family: var(--font-mono); font-size: var(--step-1); font-variant-numeric: tabular-nums; }
+
+/* tables */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: var(--step--1); }
+th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 500; color: var(--muted); background: var(--surface-2); position: sticky; top: 0; }
+th.sortable { cursor: pointer; }
+td.num, th.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: var(--surface-2); }
+td a { color: var(--ink); font-weight: 500; }
+td input { width: 9em; padding: 3px 6px; }
+
+/* signal chips */
+.sig-buy_zone { color: var(--up); }
+.sig-sell_zone { color: var(--gold); }
+.sig-invalidated { color: var(--down); }
+.sig-watch { color: var(--info); }
+.sig-hold { color: var(--muted); }
+
+/* rule check details */
+.checks { list-style: none; padding: 0; margin: 6px 0 0; font-size: var(--step--1); }
+.checks li { display: flex; gap: 6px; align-items: baseline; }
+.checks .pass::before { content: "✓"; color: var(--up); }
+.checks .fail::before { content: "✗"; color: var(--muted); }
+.checks .missing::before { content: "?"; color: var(--warn); }
+
+/* chart */
+.chart { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .price { fill: none; stroke: var(--ink); stroke-width: 1.6; }
+.chart .area { fill: var(--gold-soft); opacity: 0.6; }
+.chart .baseline { stroke: var(--gold); stroke-width: 1.4; stroke-dasharray: 5 4; }
+.chart .event { stroke: var(--info); stroke-width: 1; stroke-dasharray: 2 3; }
+.chart .event-label { fill: var(--info); }
+.chart .buy { fill: var(--up); }
+.chart .sell { fill: var(--down); }
+
+.empty { padding: 24px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: var(--radius); }
+.note { font-size: var(--step--1); color: var(--muted); margin: 0; }
+details > summary { cursor: pointer; font-weight: 500; }
+textarea { width: 100%; min-height: 4.5em; }
+form.inline { display: contents; }
+.danger { color: var(--down); }
+pre.mono { white-space: pre-wrap; font-size: var(--step--1); background: var(--surface-2); padding: 10px; border-radius: var(--radius); overflow-x: auto; }
