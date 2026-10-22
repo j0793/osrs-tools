@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSRS Combat Achievements Tracker</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1l2 4 4 .6-3 3 .7 4.4L8 11l-3.7 2 .7-4.4-3-3L6 5z' fill='%23c9942f'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <a class="hub-link" href="../">&larr; OSRS Tools</a>
+    <h1>OSRS Combat Achievements Tracker</h1>
+    <p class="subtitle">Look up your progress, or a friend's, straight from WikiSync.</p>
+  </header>
+
+  <section class="lookup-bar">
+    <input id="username-input" type="text" placeholder="OSRS username" autocomplete="off">
+    <button id="lookup-btn">Look up</button>
+    <span id="lookup-status" class="status"></span>
+  </section>
+
+  <section class="controls" id="controls" hidden>
+    <input id="search-input" type="text" placeholder="Search boss, task, or description...">
+
+    <select id="tier-select">
+      <option value="All">All tiers</option>
+      <option value="Easy">Easy</option>
+      <option value="Medium">Medium</option>
+      <option value="Hard">Hard</option>
+      <option value="Elite">Elite</option>
+      <option value="Master">Master</option>
+      <option value="Grandmaster">Grandmaster</option>
+    </select>
+
+    <select id="boss-select">
+      <option value="All">All bosses</option>
+    </select>
+
+    <label class="checkbox-label">
+      <input type="checkbox" id="incomplete-checkbox">
+      Show only incomplete
+    </label>
+
+    <span id="progress-label" class="progress-label"></span>
+  </section>
+
+  <section class="mastery-bar" id="mastery-bar" hidden></section>
+
+  <section class="table-wrap" id="table-wrap" hidden>
+    <table id="task-table">
+      <thead>
+        <tr>
+          <th class="col-done">Done</th>
+          <th class="col-tier">Tier</th>
+          <th class="col-boss">Boss</th>
+          <th class="col-task">Task</th>
+          <th class="col-desc">Description</th>
+        </tr>
+      </thead>
+      <tbody id="task-tbody"></tbody>
+    </table>
+  </section>
+
+  <p class="empty-state" id="empty-state">
+    Enter an OSRS username above and click "Look up" to see task completion.
+  </p>
+
+  <script src="app.js"></script>
+</body>
+</html>

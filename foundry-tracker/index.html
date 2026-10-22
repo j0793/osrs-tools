@@ -1,0 +1,882 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giants' Foundry Planner</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2 10h12l-2 4H4z' fill='%23ff981f'/%3E%3Cpath d='M5 9c0-3 2-3 1-7 3 2 5 4 4 7z' fill='%23ffff00'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600&family=Barlow+Condensed:wght@600&display=swap">
+<style>
+/* Layout: one page, top to bottom — furnace goal panel, then the armory with the counter beside it, then rune alching with the runite rocks list beside it. Single dark look modelled on the game's stone-and-gold interface. */
+:root{
+  --bg:#211a12; --panel:#3a3024; --well:#15100a; --rim:#6b5a42; --line:#2e2519;
+  --text:#ece0c4; --muted:#a9997b; --gold:#ff981f; --yellow:#ffff00;
+  --mith:#7383d6; --mith-dk:#3a4377; --addy:#62b16f; --addy-dk:#2e5a36; --rune:#56c6cc; --rune-dk:#1f6d72;
+  --good:#45d160; --bad:#ff6150;
+  --f-disp:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-num:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.45 var(--f-body)}
+.wrap{max-width:1140px;margin:0 auto;padding-block:20px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:grid;gap:20px}
+h1,h2{font-family:var(--f-disp);font-weight:600;margin:0;letter-spacing:.02em;text-wrap:balance;text-shadow:1px 1px 0 #000}
+h1{font-size:1.9rem;color:var(--yellow)}
+h2{font-size:1.2rem;color:var(--yellow)}
+p{margin:0}
+.muted{color:var(--muted)}
+.small{font-size:.8rem}
+.label{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.panel{background:var(--panel);border:2px solid #000;box-shadow:inset 0 0 0 2px var(--rim);border-radius:4px;padding:16px;display:grid;gap:14px;min-width:0}
+.head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:10px}
+button{font:inherit;color:var(--text);cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+input[type=number],select{background:var(--well);color:var(--yellow);border:1px solid var(--rim);border-radius:3px;font:600 1.05rem var(--f-num);padding:5px 6px;text-align:center;min-width:0}
+select{text-align:left;color:var(--text);font:500 .95rem var(--f-body);padding:6px 8px}
+.stepper{display:inline-flex;align-items:stretch;gap:3px}
+.stepper input{width:4.2em}
+.sb{width:32px;min-height:32px;background:#4a3e2e;border:1px solid #000;border-radius:3px;font-weight:700;font-size:1.05rem;line-height:1}
+.sb:hover{background:#5d4c34;color:var(--yellow)}
+.btn{background:#5b4a32;border:2px solid #000;box-shadow:inset 0 0 0 1px var(--gold);border-radius:3px;padding:7px 14px;font:600 .95rem var(--f-disp);color:var(--yellow)}
+.btn:hover{background:#6e5a3c}
+.ghost{background:none;border:1px solid var(--rim);border-radius:3px;padding:5px 10px;font-size:.85rem;color:var(--muted)}
+.ghost:hover{color:var(--text);border-color:var(--gold)}
+.field{display:grid;gap:4px}
+
+/* inventory */
+.top{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:stretch}
+@media (max-width:900px){.top{grid-template-columns:1fr}}
+/* ---------- armory ---------- */
+.armory{position:relative;display:grid;gap:14px;align-content:start;padding:16px 18px 18px;border:2px solid #000;border-radius:5px;min-width:0;
+  background:repeating-linear-gradient(90deg,rgba(0,0,0,.45) 0 2px,transparent 2px 92px),repeating-linear-gradient(90deg,rgba(0,0,0,.10) 0 1px,transparent 1px 6px),repeating-linear-gradient(90deg,rgba(255,220,170,.05) 0 2px,transparent 2px 11px),linear-gradient(#3e2715,#2c1b0e);
+  box-shadow:inset 0 0 0 2px #5c3b1f,inset 0 0 50px rgba(0,0,0,.6)}
+.armhead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.plaque{display:inline-block;padding:5px 16px;border-radius:3px;font:600 1.05rem var(--f-disp);letter-spacing:.22em;text-transform:uppercase;color:#2b1a06;text-shadow:0 1px 0 rgba(255,255,255,.45);
+  background:linear-gradient(#f6d77a,#c8952f 55%,#8a5e14);border:1px solid #3a2608;box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 2px 4px rgba(0,0,0,.6)}
+.rack{display:grid;gap:0}
+.rack .items{position:relative;z-index:1;padding:0 6px}
+.items{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:620px){.items{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.shelf{position:relative;height:16px;margin-top:-2px;border:1px solid #000;border-radius:2px;background:repeating-linear-gradient(0deg,rgba(0,0,0,.12) 0 1px,transparent 1px 5px),repeating-linear-gradient(0deg,rgba(255,220,170,.06) 0 2px,transparent 2px 9px),linear-gradient(#7a5030,#4e3019 60%,#2e1c0e);box-shadow:0 8px 12px -4px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,220,170,.25)}
+.shelf .tag2{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:0 10px;font:600 .62rem/14px var(--f-disp);letter-spacing:.24em;text-transform:uppercase;color:#2b1a06;background:linear-gradient(#e9c86a,#a87a22);border:1px solid #3a2608;border-radius:2px}
+.rack.m .tag2{background:linear-gradient(#b4b4dc,#6c6c98)} .rack.a .tag2{background:linear-gradient(#bcd6bc,#6f8a6f)}
+.rack+.rack{margin-top:8px}
+.chest{position:relative;display:grid;grid-template-columns:64px minmax(0,1fr);gap:8px;align-items:center;padding:17px 8px 15px;margin-bottom:0;border:2px solid #120b05;border-radius:5px 5px 2px 2px;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.12) 0 1px,transparent 1px 5px),repeating-linear-gradient(0deg,rgba(255,220,170,.06) 0 2px,transparent 2px 9px),linear-gradient(#6e4526,#4c2f18);box-shadow:inset 0 0 0 1px rgba(255,210,150,.12),inset 0 -6px 10px rgba(0,0,0,.4),0 3px 0 #0b0703}
+.chest::before,.chest::after{content:"";position:absolute;bottom:4px;width:9px;height:9px;background:linear-gradient(135deg,#9aa0a6,#3c4045);border:1px solid #000}
+.chest::before{left:3px;border-radius:0 0 0 3px} .chest::after{right:3px;border-radius:0 0 3px 0}
+.chest .lid{position:absolute;left:-2px;right:-2px;top:-2px;height:12px;border:2px solid #120b05;border-radius:5px 5px 0 0;background:linear-gradient(#5a3a20,#3a2412);box-shadow:inset 0 1px 0 rgba(255,210,150,.25)}
+.chest .lid::before{content:"";position:absolute;left:0;right:0;top:3px;height:3px;background:linear-gradient(#a7adb3,#4b5056)}
+.chest .lid i{position:absolute;left:50%;top:1px;width:12px;height:9px;transform:translateX(-50%);border-radius:2px;background:linear-gradient(#ffe08a,#b9861f);border:1px solid #3a2608}
+.chest.on{box-shadow:inset 0 0 0 1px rgba(255,210,150,.12),inset 0 -6px 10px rgba(0,0,0,.4),0 3px 0 #0b0703,0 0 0 2px rgba(255,200,80,.55)}
+.pic{width:64px;height:64px;padding:5px;border:2px solid #1a0f06;border-radius:4px;position:relative;display:grid;place-items:center;
+  background:radial-gradient(circle at 50% 40%,#4a1a20,#2a0b10 70%,#1a0609);box-shadow:inset 0 3px 8px rgba(0,0,0,.7)}
+.pic:hover{border-color:#c8952f}
+.pic svg{width:56px;height:56px;display:block;filter:drop-shadow(0 2px 2px rgba(0,0,0,.7))}
+.pic .q{position:absolute;top:1px;left:4px;font:600 .95rem var(--f-num);color:var(--yellow);text-shadow:1px 1px 0 #000}
+.itxt{min-width:0}
+.iname{font-weight:600;font-size:.9rem;line-height:1.2;color:#fbe9c8;text-shadow:0 1px 0 #000}
+.imeta{font-size:.74rem;color:#d4b48c;text-shadow:0 1px 0 rgba(0,0,0,.6)}
+.qty{grid-column:1/-1;display:flex;gap:3px}
+.qty input{flex:1;width:0}
+.qty .stock{width:auto;padding:0 8px;font-size:.74rem}
+@media (max-width:620px){.chest{grid-template-columns:1fr;justify-items:center;text-align:center}.qty{width:100%}}
+@media (max-width:400px){.armory{padding:12px 10px 14px}.rack .items{padding:0 2px;gap:8px}.chest{padding:16px 5px 14px}.armory .qty .sb{width:26px;min-height:30px}.qty .stock{padding:0 4px}.imeta{font-size:.7rem}}
+/* stone buttons used in the armory and counter */
+.armory .sb,.counter .sb,.stone{background:radial-gradient(circle at 30% 22%,rgba(255,255,255,.20),transparent 55%),repeating-radial-gradient(circle at 70% 65%,rgba(0,0,0,.14) 0 1px,transparent 1px 3px),repeating-radial-gradient(circle at 20% 80%,rgba(255,255,255,.06) 0 1px,transparent 1px 4px),linear-gradient(#807a72,#504a44);border:1px solid #1b1815;border-radius:3px;color:#f6efe0;text-shadow:0 1px 0 #000;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 -2px 0 rgba(0,0,0,.4),0 1px 0 #000}
+.armory .sb:hover,.counter .sb:hover,.stone:hover{filter:brightness(1.15);color:var(--yellow)}
+.armory .sb:active,.counter .sb:active,.stone:active{box-shadow:inset 0 2px 3px rgba(0,0,0,.5)}
+.stone{padding:6px 12px;font:600 .85rem var(--f-disp)}
+.armory input[type=number],.counter input[type=number]{background:#140c06;border:1px solid #6b4524;box-shadow:inset 0 2px 4px rgba(0,0,0,.7)}
+.brass{padding:7px 14px;border-radius:3px;font:600 .95rem var(--f-disp);color:#2b1a06;text-shadow:0 1px 0 rgba(255,255,255,.4);background:linear-gradient(#f6d77a,#c8952f 55%,#8a5e14);border:1px solid #3a2608;box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 2px 3px rgba(0,0,0,.6)}
+.brass:hover{filter:brightness(1.08)}
+.quarter{display:grid;gap:8px;padding:12px;border:2px solid #120b05;border-radius:4px;background:repeating-linear-gradient(0deg,rgba(0,0,0,.12) 0 1px,transparent 1px 5px),repeating-linear-gradient(0deg,rgba(255,220,170,.06) 0 2px,transparent 2px 9px),linear-gradient(#583820,#3c2513);box-shadow:inset 0 0 0 1px rgba(255,210,150,.1)}
+.qhead{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.qhead .label,.armory .label{color:#e8c99a}
+.qnote,.armnote{font-size:.8rem;color:#d4b48c}
+.quarter .overflow{background:rgba(10,6,3,.55);border-color:#7a5030}
+/* ---------- counter ---------- */
+.counter{display:grid;gap:16px;align-content:start;min-width:0}
+.till{position:relative;display:grid;gap:12px;padding:20px 16px 16px;border:2px solid #000;border-radius:5px;min-width:0;
+  background:radial-gradient(circle at 20% 10%,rgba(255,255,255,.05),transparent 50%),repeating-radial-gradient(circle at 60% 40%,rgba(0,0,0,.16) 0 1px,transparent 1px 4px),linear-gradient(#3b3733,#24211e);
+  box-shadow:inset 0 0 0 1px #5b544c,inset 0 -20px 30px -20px rgba(0,0,0,.8)}
+.till::before{content:"";position:absolute;left:-2px;right:-2px;top:-2px;height:7px;border-radius:5px 5px 0 0;background:linear-gradient(#ffe08a,#c8952f 50%,#7a5212);border-bottom:1px solid #000}
+.tillhead .label{color:#e8d2a8;letter-spacing:.14em}
+.tillnote{font-size:.78rem;color:#b8aa94}
+.banner{position:relative;margin-top:8px;padding:14px 14px 12px;border:2px solid #120b05;border-radius:3px;background:repeating-linear-gradient(0deg,rgba(0,0,0,.12) 0 1px,transparent 1px 5px),repeating-linear-gradient(0deg,rgba(255,220,170,.06) 0 2px,transparent 2px 9px),linear-gradient(#7a4f2c,#56361c);box-shadow:inset 0 1px 0 rgba(255,220,170,.25),inset 0 -3px 0 rgba(0,0,0,.3),0 6px 10px -4px rgba(0,0,0,.8)}
+.banner::before,.banner::after{content:"";position:absolute;top:-10px;width:2px;height:12px;background:#2a1a0c}
+.banner::before{left:22px} .banner::after{right:22px}
+.banner dl.kv dt{color:#f3dcb4;text-shadow:0 1px 0 #000}
+.banner dl.kv dd{color:#fff6dc;text-shadow:0 1px 0 #000}
+.banner dl.kv dd.good{color:#8dff9f} .banner dl.kv dd.bad{color:#ff8a7a}
+.counter .barsum>div{background:rgba(10,8,6,.55)}
+.counter .cheap .label{color:#e8d2a8}
+
+/* readout */
+.big{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.big b{font:600 3rem/1 var(--f-num);color:var(--yellow);text-shadow:1px 1px 0 #000}
+.pill{display:inline-block;font-size:.74rem;font-weight:600;padding:2px 9px;border-radius:99px;border:1px solid currentColor}
+.pill.good{color:var(--good)} .pill.warn{color:var(--gold)} .pill.bad{color:var(--bad)}
+.barsum{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.barsum>div{background:var(--well);border:1px solid var(--line);border-left:4px solid var(--mith);border-radius:3px;padding:6px 10px;display:grid;gap:1px}
+.barsum>.a{border-left-color:var(--addy)}
+.barsum b{font:600 1.6rem/1 var(--f-num);color:var(--yellow);text-shadow:1px 1px 0 #000}
+.barsum small{font-size:.74rem;color:var(--muted)}
+dl.kv{display:grid;grid-template-columns:1fr auto;gap:4px 12px;margin:0;font-size:.9rem}
+dl.kv dt{color:var(--muted)} dl.kv dd{margin:0;text-align:right;font:600 1.02rem var(--f-num);font-variant-numeric:tabular-nums}
+.good{color:var(--good)} .bad{color:var(--bad)}
+hr{border:0;border-top:1px solid #000;border-bottom:1px solid var(--rim);margin:0;width:100%}
+.cheap{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.overflow{background:var(--well);border:1px dashed var(--rim);border-radius:4px;padding:8px 10px;font-size:.84rem;display:grid;gap:4px}
+.overflow b.y{color:var(--yellow);font-weight:600}
+.goal{gap:16px;padding:16px 18px;background:linear-gradient(#1f1211,#160c0b);box-shadow:inset 0 0 0 2px #4a2a29}
+.goal .status{color:#b39189}
+.ghead{display:grid;grid-template-columns:minmax(0,1.6fr) repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:900px){.ghead{grid-template-columns:repeat(2,minmax(0,1fr))}.ghead .tile.user{grid-column:1/-1}}
+.tile{background:var(--well);border:1px solid var(--line);border-radius:4px;padding:8px 10px;display:grid;gap:6px;align-content:start;min-width:0}
+.tile .row{display:flex;gap:6px;align-items:center;min-height:38px}
+.tile input[type=text],.tile input[type=number]{height:38px;font:600 1.15rem var(--f-num);background:#14100b;border:1px solid var(--rim);border-radius:3px;color:var(--yellow);padding:0 8px;min-width:0;width:100%;text-align:left}
+.tile input[type=text]{color:var(--text);font:500 1rem var(--f-body)}
+.tile .stepper input{width:3.2em;text-align:center;padding:0 2px}
+.tile .sb{min-height:38px}
+.tile .btn{height:38px;white-space:nowrap}
+.tile .val{font:600 1.9rem/38px var(--f-num);color:var(--yellow);text-shadow:1px 1px 0 #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:900px){.tile .val{font-size:1.5rem}}
+.tile small{font-size:.74rem;color:var(--muted);margin-top:-4px}
+/* big level bar */
+.lvlbar{display:grid;gap:6px}
+.lvlbar .cap{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;font-size:.85rem;color:var(--muted)}
+.lvlbar .cap b{color:var(--text);font:600 1rem var(--f-num)}
+.lvlbar .cap .lv{font:600 1.25rem var(--f-num);color:var(--yellow);text-shadow:1px 1px 0 #000}
+.bigbar{position:relative;height:46px;background:#120e09;border:2px solid #000;box-shadow:inset 0 0 0 1px var(--rim),inset 0 6px 10px rgba(0,0,0,.5);border-radius:3px}
+.bigbar>.fill{position:absolute;inset:0 auto 0 0;background:linear-gradient(#ffe266,#e0a21c 55%,#a8700c);box-shadow:inset 0 2px 0 rgba(255,255,255,.35)}
+.bigbar>.pct{position:absolute;left:10px;top:50%;transform:translateY(-50%);font:600 1rem var(--f-num);color:#fff;text-shadow:1px 1px 0 #000,0 0 4px #000;pointer-events:none}
+.tseg{position:absolute;top:-6px;bottom:-6px;display:grid;grid-template-rows:1fr 1fr;border:2px solid #5ff2ff;border-radius:2px;background:#0a2a30;box-shadow:0 0 10px rgba(95,242,255,.55);min-width:6px;overflow:hidden;transition:left .2s,width .2s}
+.lane{position:relative;overflow:hidden;background:repeating-linear-gradient(-45deg,#ff6b5a 0 4px,#7a1d14 4px 8px)}
+.lane+.lane{border-top:1px solid #000}
+.lane>i{position:absolute;inset:0 auto 0 0;transition:width .2s}
+.lane.xp>i{background:linear-gradient(#a6f8ff,#29c3dd)}
+.lane.gp>i{background:linear-gradient(#fff0a0,#f2c230 45%,#b8800e);overflow:hidden}
+@keyframes shine{0%{left:-40%}60%,100%{left:110%}}
+@media (prefers-reduced-motion:reduce){.lane.gp>i::after,.ztrack.gp>i::after{animation:none;display:none}}
+/* zoom lens */
+.lens{display:block;width:100%;height:30px;margin:-2px 0 -4px}
+.lens polygon{fill:rgba(95,242,255,.10);stroke:rgba(95,242,255,.55);stroke-width:1;vector-effect:non-scaling-stroke}
+.zoom{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 10px;align-items:center;background:#0d1d20;border:2px solid #5ff2ff;border-radius:4px;padding:10px 12px;box-shadow:0 0 14px rgba(95,242,255,.18)}
+.zoom .zl{font:600 .72rem var(--f-disp);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ztrack{position:relative;height:26px;border:1px solid #000;border-radius:2px;overflow:hidden;background:repeating-linear-gradient(-45deg,#ff6b5a 0 5px,#7a1d14 5px 10px)}
+.ztrack>i{position:absolute;inset:0 auto 0 0;transition:width .2s}
+.ztrack.xp>i{background:linear-gradient(#a6f8ff,#29c3dd)}
+.ztrack.gp>i{background:linear-gradient(#fff3a8,#f5c535 45%,#b67d10);overflow:hidden}
+.lane.gp>i::after,.ztrack.gp>i::after{content:"";position:absolute;top:0;bottom:0;width:40%;left:-40%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.75) 50%,transparent);animation:shine 2.8s ease-in-out infinite}
+.ztrack span{position:absolute;top:50%;transform:translateY(-50%);font:600 .9rem var(--f-num);white-space:nowrap}
+.ztrack .got{left:8px;color:#06262b;text-shadow:0 1px 0 rgba(255,255,255,.4)}
+.ztrack.gp .got{color:#3a2500}
+.ztrack .lost{right:8px;color:#fff;text-shadow:1px 1px 0 #000,0 0 3px #000}
+.zfoot{grid-column:1/-1;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:.78rem;color:var(--muted)}
+/* mistakes slider */
+.mslide{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px 16px;align-items:center}
+@media (max-width:620px){.mslide{grid-template-columns:1fr}}
+.mslide .mval{font:600 1.6rem/1 var(--f-num);color:var(--yellow);text-shadow:1px 1px 0 #000;min-width:4.2em}
+.mslide .mval small{display:block;font:600 .72rem var(--f-disp);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.rangewrap{position:relative;padding-bottom:18px}
+input[type=range].mist{-webkit-appearance:none;appearance:none;width:100%;height:14px;border-radius:7px;border:1px solid #000;background:linear-gradient(90deg,#5ff2ff 0 4.2%,#7dff9a 4.2% 29.2%,#ffc94a 29.2% 62.5%,#ff6b5a 62.5%);margin:0;cursor:pointer}
+input[type=range].mist::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,#d9d0b8 45%,#7a6a4a);border:2px solid #000;box-shadow:0 0 0 2px var(--yellow)}
+input[type=range].mist::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,#d9d0b8 45%,#7a6a4a);border:2px solid #000;box-shadow:0 0 0 2px var(--yellow)}
+input[type=range].mist:focus-visible{outline:2px solid var(--yellow);outline-offset:4px}
+.ticks{position:absolute;left:12px;right:12px;bottom:0;height:14px;font:600 .7rem var(--f-disp);letter-spacing:.04em}
+.ticks span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.mread{font-size:.85rem;color:var(--muted);text-align:right}
+.mread b{font:600 1.05rem var(--f-num)}
+.mread .xtra{display:block;margin-top:3px;font-size:.8rem;color:var(--text)}
+.mread .xtra b{font-size:.9rem}
+.tp{color:#5ff2ff} .tf{color:#7dff9a} .tb{color:#ffc94a} .tx{color:#ff6b5a}
+/* slim goal bar */
+.goalbar{position:relative;height:16px;background:var(--well);border:1px solid #000;border-radius:2px;overflow:hidden}
+.goalbar i{position:absolute;inset:0 auto 0 0;background:linear-gradient(var(--good),#1f7a33)}
+.goalbar span{position:absolute;inset:0;display:grid;place-items:center;font:600 .74rem var(--f-num);text-shadow:1px 1px 0 #000}
+.status{font-size:.78rem}
+
+/* rune */
+.rgrid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:20px;align-items:start}
+@media (max-width:900px){.rgrid{grid-template-columns:1fr}}
+.fields{display:flex;flex-wrap:wrap;gap:14px}
+.bars{display:grid;gap:4px}
+.brow{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;align-items:center;background:none;border:1px solid transparent;border-radius:3px;padding:3px 5px;text-align:left}
+.brow:hover:not(:disabled){border-color:var(--rim)}
+.brow.sel{border-color:var(--yellow);background:#2f2619}
+.brow:disabled{opacity:.4;cursor:default}
+.brow .nm{font-size:.85rem;line-height:1.15}
+.brow .nm small{display:block;font-size:.72rem;color:var(--muted)}
+.btrack{position:relative;height:20px;background:var(--well);border-radius:2px}
+.btrack i{position:absolute;inset:0 auto 0 0;background:linear-gradient(var(--rune),var(--rune-dk));border-radius:2px}
+.brow.sel .btrack i{background:linear-gradient(var(--yellow),var(--gold))}
+.btrack span{position:absolute;top:50%;transform:translateY(-50%);font:600 .82rem var(--f-num);text-shadow:1px 1px 0 #000;white-space:nowrap}
+@media (max-width:560px){.brow{grid-template-columns:105px minmax(0,1fr)}}
+.brow .nm .cnt{font-style:normal;font:600 .9rem var(--f-num);color:var(--yellow);margin-right:5px}
+.seg{display:flex;border:1px solid var(--rim);border-radius:3px;overflow:hidden}
+.seg button{background:var(--well);border:0;padding:7px 12px;font:600 .88rem var(--f-disp);color:var(--muted)}
+.seg button+button{border-left:1px solid var(--rim)}
+.seg button.on{background:#5b4a32;color:var(--yellow)}
+.mixbox{background:var(--well);border:1px solid var(--rim);border-radius:4px;display:grid;gap:0}
+.mixbox[hidden]{display:none}
+.mixbox>.head{padding:9px 12px;align-items:baseline}
+#mixUsed{font:600 .95rem var(--f-num);color:var(--yellow)}
+#mixUsed.bad{color:var(--bad)}
+.hlist{display:grid;padding:0 8px;border-top:1px solid var(--line)}
+.hrow{display:grid;grid-template-columns:minmax(0,1fr) auto 68px;gap:6px;align-items:center;padding:4px 2px;border-bottom:1px solid var(--line);font-size:.84rem}
+.hrow.on .hn{color:var(--yellow)}
+.hrow small{display:block;font-size:.7rem;color:var(--muted)}
+.hrow .stepper input{width:3em}
+.hrow .sb{width:26px;min-height:26px}
+.hrow .t{text-align:right;font:600 .92rem var(--f-num);color:var(--yellow)}
+.hfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;font-size:.84rem}
+.rockbox{display:grid;gap:8px;background:var(--well);border:1px solid var(--rim);border-radius:4px;padding:10px 12px}
+.rockbox .head{align-items:baseline}
+.rlist{display:grid}
+.rk{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:start;padding:6px 0;border-top:1px solid var(--line);font-size:.86rem;line-height:1.25}
+.rk .c{font:600 1.15rem/1.1 var(--f-num);color:var(--yellow);text-shadow:1px 1px 0 #000;text-align:right}
+.rk .rn{font-weight:600}
+.rk small{display:block;font-size:.74rem;color:var(--muted);margin-top:2px}
+.tag{display:inline-block;font-size:.7rem;font-weight:600;padding:1px 7px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.tag.s{color:var(--good)} .tag.m{color:var(--gold)} .tag.l{color:var(--muted)}
+
+/* ---------- forge header ---------- */
+.forge{position:relative;overflow:hidden;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:16px;padding:22px;border:2px solid #000;border-radius:6px;
+  background:radial-gradient(ellipse 70% 90% at 50% 115%,rgba(255,110,20,.45),rgba(160,40,0,.18) 45%,transparent 70%),
+    radial-gradient(circle at 12% 0%,rgba(255,255,255,.04),transparent 40%),
+    repeating-radial-gradient(circle at 30% 40%,rgba(0,0,0,.18) 0 1px,transparent 1px 4px),
+    linear-gradient(#17110c,#0d0907);
+  box-shadow:inset 0 0 0 1px #3a2a1a,inset 0 -18px 40px -20px rgba(255,90,0,.6)}
+.forge::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,transparent,#ff5a00 20%,#ffc23a 50%,#ff5a00 80%,transparent);filter:blur(.5px);opacity:.85}
+.embers{position:absolute;inset:0;pointer-events:none}
+.embers i{position:absolute;bottom:-6px;width:3px;height:3px;border-radius:50%;background:#ffb347;box-shadow:0 0 6px 2px rgba(255,120,20,.8);opacity:0;animation:ember linear infinite}
+@keyframes ember{0%{transform:translate(0,0);opacity:0}10%{opacity:1}70%{opacity:.7}100%{transform:translate(14px,-150px);opacity:0}}
+.plate{position:relative;z-index:1;padding:16px 34px 14px;border-radius:4px;border:1px solid #1d1f22;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 1px,transparent 1px 3px),
+    repeating-linear-gradient(90deg,rgba(0,0,0,.06) 0 2px,transparent 2px 7px),
+    linear-gradient(170deg,#c9ced4 0%,#8e959d 38%,#b7bdc4 55%,#757c84 100%);
+  box-shadow:0 1px 0 rgba(255,255,255,.25) inset,0 -2px 0 rgba(0,0,0,.35) inset,0 8px 24px rgba(0,0,0,.6),0 10px 28px -8px rgba(255,100,0,.45)}
+.plate::before{content:"";position:absolute;inset:0;border-radius:4px;background:linear-gradient(180deg,transparent 60%,rgba(255,110,30,.28));pointer-events:none}
+.rivet{position:absolute;width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f4f6f8,#8b9299 50%,#3c4146);box-shadow:0 1px 1px rgba(0,0,0,.6)}
+.plate h1{display:grid;gap:0;margin:0;text-shadow:none}
+.plate .kicker{font:600 .78rem var(--f-disp);letter-spacing:.42em;text-transform:uppercase;color:#3c4046;text-shadow:0 1px 0 rgba(255,255,255,.45)}
+.plate .etch{font:600 clamp(2rem,5.6vw,3.3rem)/1 var(--f-num);letter-spacing:.1em;text-transform:uppercase;color:#4a4f55;
+  text-shadow:0 1px 0 rgba(255,255,255,.55),0 -1px 0 rgba(0,0,0,.75),0 0 1px rgba(0,0,0,.4)}
+.plate .sub{margin-top:6px;font-size:.8rem;font-weight:600;color:#15181b;text-shadow:0 1px 0 rgba(255,255,255,.4)}
+.slotplate{position:relative;z-index:1;background:rgba(10,6,3,.72);border:1px solid #6a3414;border-radius:4px;padding:8px 10px;box-shadow:0 0 14px rgba(255,90,0,.25)}
+.slotplate .label{color:#ffb070}
+@media (max-width:560px){.plate{padding:14px 20px 12px;width:100%}.slotplate{width:100%}}
+@media (prefers-reduced-motion:reduce){.embers{display:none}}
+/* ---------- furnace mouth around the goal fields ---------- */
+.furnace{padding:16px 16px 0;border-radius:12px 12px 4px 4px;background:linear-gradient(180deg,rgba(126,87,85,.18),rgba(0,0,0,.35)),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='24'%3E%3Crect width='48' height='24' fill='%230d0606'/%3E%3Crect x='1' y='1' width='46' height='10' rx='1' fill='%233a1f1e'/%3E%3Crect x='-23' y='13' width='46' height='10' rx='1' fill='%23331a19'/%3E%3Crect x='25' y='13' width='46' height='10' rx='1' fill='%23442624'/%3E%3C/svg%3E") 0 0/48px 24px,#0d0606;border:2px solid #000;box-shadow:inset 0 0 0 1px #3d2221,inset 0 0 40px rgba(0,0,0,.6)}
+.furnace .mouth{position:relative;display:grid;gap:16px;padding:18px 18px 20px;border:3px solid transparent;border-radius:44px 44px 6px 6px;
+  background:radial-gradient(ellipse 85% 70% at 50% 105%,#5a120a 0%,#2a0808 38%,#140404 70%,#0a0303 100%) padding-box,
+    linear-gradient(90deg,#ff3d00,#ff9a00,#ffd85a,#ff7a00,#ff2a00,#ffb000,#ff3d00) border-box;
+  background-size:100% 100%,300% 100%;animation:magma 9s linear infinite;
+  box-shadow:0 0 24px rgba(255,80,0,.5),inset 0 0 40px rgba(255,60,0,.22),inset 0 -30px 40px -20px rgba(255,90,0,.45)}
+@keyframes magma{to{background-position:0 0,300% 0}}
+@media (prefers-reduced-motion:reduce){.furnace .mouth{animation:none}}
+.furnace .ghead{padding:0}
+.sill{height:18px;margin:0 -16px;border-top:2px solid #000;background:repeating-linear-gradient(90deg,#1a1414 0 10px,#2a201f 10px 12px,#0a0707 12px 14px),linear-gradient(#3a2e2d,#120d0d);box-shadow:inset 0 2px 0 rgba(255,140,60,.35),0 -6px 14px rgba(255,80,0,.25)}
+.furnace .lvlbar .cap{color:#c9a497}
+.furnace .lvlbar .cap b{color:#f4e3d6}
+.furnace .bigbar{border-color:#000;box-shadow:inset 0 0 0 1px #6b2a1c,inset 0 6px 10px rgba(0,0,0,.6),0 0 16px rgba(255,90,0,.35)}
+.furnace .zoom{background:rgba(6,18,20,.88)}
+@media (max-width:560px){.furnace{padding:8px 8px 0}.furnace .mouth{padding:12px 10px 14px;gap:12px;border-radius:28px 28px 6px 6px}.sill{margin:0 -8px}}
+.furnace .tile{padding:7px 8px}.furnace .tile .stepper input{width:2.6em}.furnace .tile .sb{width:28px}}
+.furnace .tile{background:linear-gradient(rgba(14,4,4,.85),rgba(30,8,6,.85));border:1px solid rgba(255,110,40,.34);box-shadow:inset 0 -10px 18px -10px rgba(255,100,20,.5)}
+.furnace .tile .label{color:#ffb070}
+.furnace .tile small{color:#d9a37a}
+.furnace .tile input[type=text],.furnace .tile input[type=number]{background:#0e0603;border-color:#8a3e12}
+.furnace .tile .val{font-size:clamp(1.3rem,2.3vw,1.75rem);text-shadow:0 0 10px rgba(255,170,0,.45),1px 1px 0 #000}
+
+/* ---------- rune treasury ---------- */
+.treasury{position:relative;display:grid;gap:16px;padding:16px 18px 18px;border:2px solid #000;border-radius:6px;min-width:0;
+  background:linear-gradient(rgba(10,8,6,.55),rgba(10,8,6,.72)),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='96'%3E%3Crect width='160' height='96' fill='%23100c08'/%3E%3Cpolygon points='9.0,22.0 14.4,13.9 23.4,15.7 27.0,22.9 20.7,29.2 11.7,27.4' fill='%23506C77' stroke='%231d2a30' stroke-width='1'/%3E%3Cpolygon points='9.0,22.0 14.4,13.9 23.4,15.7 18.0,21.1' fill='%2386a5b0'/%3E%3Cpolygon points='27.0,22.9 20.7,29.2 16.2,26.5 19.8,22.0' fill='%232f434b'/%3E%3Cpolygon points='63.0,14.0 67.2,7.7 74.2,9.1 77.0,14.7 72.1,19.6 65.1,18.2' fill='%23506C77' stroke='%231d2a30' stroke-width='1'/%3E%3Cpolygon points='63.0,14.0 67.2,7.7 74.2,9.1 70.0,13.3' fill='%2386a5b0'/%3E%3Cpolygon points='77.0,14.7 72.1,19.6 68.6,17.5 71.4,14.0' fill='%232f434b'/%3E%3Cpolygon points='118.0,30.0 124.0,21.0 134.0,23.0 138.0,31.0 131.0,38.0 121.0,36.0' fill='%23506C77' stroke='%231d2a30' stroke-width='1'/%3E%3Cpolygon points='118.0,30.0 124.0,21.0 134.0,23.0 128.0,29.0' fill='%2386a5b0'/%3E%3Cpolygon points='138.0,31.0 131.0,38.0 126.0,35.0 130.0,30.0' fill='%232f434b'/%3E%3Cpolygon points='36.0,62.0 40.8,54.8 48.8,56.4 52.0,62.8 46.4,68.4 38.4,66.8' fill='%23506C77' stroke='%231d2a30' stroke-width='1'/%3E%3Cpolygon points='36.0,62.0 40.8,54.8 48.8,56.4 44.0,61.2' fill='%2386a5b0'/%3E%3Cpolygon points='52.0,62.8 46.4,68.4 42.4,66.0 45.6,62.0' fill='%232f434b'/%3E%3Cpolygon points='95.0,72.0 100.4,63.9 109.4,65.7 113.0,72.9 106.7,79.2 97.7,77.4' fill='%23506C77' stroke='%231d2a30' stroke-width='1'/%3E%3Cpolygon points='95.0,72.0 100.4,63.9 109.4,65.7 104.0,71.1' fill='%2386a5b0'/%3E%3Cpolygon points='113.0,72.9 106.7,79.2 102.2,76.5 105.8,72.0' fill='%232f434b'/%3E%3Cpolygon points='144.0,84.0 147.6,78.6 153.6,79.8 156.0,84.6 151.8,88.8 145.8,87.6' fill='%23506C77' stroke='%231d2a30' stroke-width='1'/%3E%3Cpolygon points='144.0,84.0 147.6,78.6 153.6,79.8 150.0,83.4' fill='%2386a5b0'/%3E%3Cpolygon points='156.0,84.6 151.8,88.8 148.8,87.0 151.2,84.0' fill='%232f434b'/%3E%3Cpolygon points='-1.0,84.0 3.2,77.7 10.2,79.1 13.0,84.7 8.1,89.6 1.1,88.2' fill='%23506C77' stroke='%231d2a30' stroke-width='1'/%3E%3Cpolygon points='-1.0,84.0 3.2,77.7 10.2,79.1 6.0,83.3' fill='%2386a5b0'/%3E%3Cpolygon points='13.0,84.7 8.1,89.6 4.6,87.5 7.4,84.0' fill='%232f434b'/%3E%3Cellipse cx='40.0' cy='39.2' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='40.0' cy='38.0' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='40.0' cy='36.0' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='40.0' cy='34.8' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='40.0' cy='32.8' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='40.0' cy='31.6' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='40.0' cy='29.6' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='40.0' cy='28.4' rx='8' ry='3' fill='%23f2c94c' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='40.0' cy='28.4' rx='4.5' ry='1.4' fill='none' stroke='%23fff1b0' stroke-width='.6' opacity='.7'/%3E%3Cellipse cx='98.0' cy='45.2' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='98.0' cy='44.0' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='98.0' cy='42.0' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='98.0' cy='40.8' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='98.0' cy='38.8' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='98.0' cy='37.6' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='98.0' cy='35.6' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='98.0' cy='34.4' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='98.0' cy='32.4' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='98.0' cy='31.2' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='98.0' cy='29.2' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='98.0' cy='28.0' rx='8' ry='3' fill='%23f2c94c' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='98.0' cy='28.0' rx='4.5' ry='1.4' fill='none' stroke='%23fff1b0' stroke-width='.6' opacity='.7'/%3E%3Cellipse cx='146.0' cy='59.2' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='146.0' cy='58.0' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='146.0' cy='56.0' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='146.0' cy='54.8' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='146.0' cy='52.8' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='146.0' cy='51.6' rx='8' ry='3' fill='%23f2c94c' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='146.0' cy='51.6' rx='4.5' ry='1.4' fill='none' stroke='%23fff1b0' stroke-width='.6' opacity='.7'/%3E%3Cellipse cx='16.0' cy='59.2' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='16.0' cy='58.0' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='16.0' cy='56.0' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='16.0' cy='54.8' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='16.0' cy='52.8' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='16.0' cy='51.6' rx='8' ry='3' fill='%23f2c94c' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='16.0' cy='51.6' rx='4.5' ry='1.4' fill='none' stroke='%23fff1b0' stroke-width='.6' opacity='.7'/%3E%3Cellipse cx='72.0' cy='91.2' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='72.0' cy='90.0' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='72.0' cy='88.0' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='72.0' cy='86.8' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='72.0' cy='84.8' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='72.0' cy='83.6' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='72.0' cy='81.6' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='72.0' cy='80.4' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='72.0' cy='78.4' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='72.0' cy='77.2' rx='8' ry='3' fill='%23f2c94c' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='72.0' cy='77.2' rx='4.5' ry='1.4' fill='none' stroke='%23fff1b0' stroke-width='.6' opacity='.7'/%3E%3Cellipse cx='128.0' cy='9.2' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='128.0' cy='8.0' rx='8' ry='3' fill='%23d9a838' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='128.0' cy='6.0' rx='8' ry='3' fill='%23a8761c' stroke='%234a3008' stroke-width='.8'/%3E%3Cellipse cx='128.0' cy='4.8' rx='8' ry='3' fill='%23f2c94c' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='128.0' cy='4.8' rx='4.5' ry='1.4' fill='none' stroke='%23fff1b0' stroke-width='.6' opacity='.7'/%3E%3Cellipse cx='60.0' cy='40.0' rx='6' ry='2.4' fill='%23e2b13e' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='84.0' cy='28.0' rx='6' ry='2.4' fill='%23e2b13e' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='120.0' cy='52.0' rx='6' ry='2.4' fill='%23e2b13e' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='30.0' cy='80.0' rx='6' ry='2.4' fill='%23e2b13e' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='88.0' cy='60.0' rx='6' ry='2.4' fill='%23e2b13e' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='150.0' cy='18.0' rx='6' ry='2.4' fill='%23e2b13e' stroke='%235a3e0e' stroke-width='.7'/%3E%3Cellipse cx='8.0' cy='40.0' rx='6' ry='2.4' fill='%23e2b13e' stroke='%235a3e0e' stroke-width='.7'/%3E%3C/svg%3E") 0 0/160px 96px,#100c08;
+  box-shadow:inset 0 0 0 2px #3a4a50,inset 0 0 0 4px #000,inset 0 0 60px rgba(0,0,0,.7)}
+.trhead{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.trsub{font-size:.82rem;color:#d6e2e6;text-shadow:0 1px 2px #000,0 0 6px #000}
+.plaque.rune{background:linear-gradient(#a9c3cc,#506C77 55%,#2e4148);color:#0d171b;text-shadow:0 1px 0 rgba(255,255,255,.35);border-color:#0d171b}
+.vault{padding:14px;border-radius:5px;background:rgba(12,16,18,.86);border:1px solid #33464d;box-shadow:0 6px 18px rgba(0,0,0,.6)}
+.vault .label{color:#a9c3cc}
+.vnote{margin:0;font-size:.8rem;color:#b9c9ce}
+.chartfoot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.treasury .sb,.treasury .stone{background:radial-gradient(circle at 30% 22%,rgba(255,255,255,.20),transparent 55%),repeating-radial-gradient(circle at 70% 65%,rgba(0,0,0,.14) 0 1px,transparent 1px 3px),linear-gradient(#807a72,#504a44);border:1px solid #1b1815;border-radius:3px;color:#f6efe0;text-shadow:0 1px 0 #000;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 -2px 0 rgba(0,0,0,.4),0 1px 0 #000}
+.treasury .sb:hover,.treasury .stone:hover{filter:brightness(1.15);color:var(--yellow)}
+.treasury .stone{padding:6px 12px;font:600 .85rem var(--f-disp)}
+.treasury input[type=number]{background:#0a0e10;border:1px solid #3d555e;box-shadow:inset 0 2px 4px rgba(0,0,0,.7)}
+.treasury .seg{border-color:#3d555e}.treasury .seg button{background:#0a0e10}.treasury .seg button.on{background:linear-gradient(#7d9aa5,#506C77);color:#fff;text-shadow:0 1px 0 #000}
+.treasury .brow{grid-template-columns:150px minmax(0,1fr) 22px;padding:6px;border:1px solid #23323a;background:rgba(0,0,0,.25)}
+.treasury .brow .rank{font:600 .8rem/20px var(--f-num);font-style:normal;text-align:center;width:22px;height:22px;border-radius:50%;background:linear-gradient(#ffe08a,#b9861f);color:#2b1a06;border:1px solid #3a2608}
+.treasury .btrack{height:26px;background:#0a0e10;border:1px solid #000}
+.treasury .btrack i{background:linear-gradient(#a9c3cc,#506C77 55%,#34474f)}
+.treasury .brow.sel{border-color:#ffd24a;background:rgba(60,48,16,.45)}
+.treasury .brow.sel .btrack i{background:linear-gradient(#fff0a0,#f2c230 45%,#b8800e)}
+.treasury .btrack span{font-size:.9rem}
+.ledger{position:relative;display:grid;gap:10px;padding:20px 16px 16px;border:2px solid #000;border-radius:5px;
+  background:radial-gradient(circle at 20% 10%,rgba(255,255,255,.05),transparent 50%),linear-gradient(#1f2a2e,#121a1d);box-shadow:inset 0 0 0 1px #3d555e,0 6px 18px rgba(0,0,0,.6)}
+.ledger::before{content:"";position:absolute;left:-2px;right:-2px;top:-2px;height:7px;border-radius:5px 5px 0 0;background:linear-gradient(#ffe08a,#c8952f 50%,#7a5212);border-bottom:1px solid #000}
+.ledger .label{color:#cfe0e6}
+.coalbox{display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid #2a2a2a;border-radius:4px;background:linear-gradient(#141414,#0b0b0b);font-size:.8rem;color:#c9c9c9}
+.coalbox b{display:block;color:#f0e6d6;font-size:.82rem}
+.coalbox i{flex:none;width:22px;height:18px;background:radial-gradient(circle at 30% 30%,#6a6a6a,#222 55%,#050505);clip-path:polygon(10% 30%,40% 0,80% 10%,100% 55%,70% 100%,20% 90%,0 60%);box-shadow:0 0 6px rgba(255,120,30,.4)}
+.ledger hr{border-top-color:#000;border-bottom-color:#3d555e}
+.mixbox.ledger{padding:14px 0 0;gap:0}
+.treasury .rockbox{background:rgba(12,16,18,.86);border:1px solid #33464d;border-radius:5px;padding:12px 14px;box-shadow:0 6px 18px rgba(0,0,0,.6)}
+.treasury .rockbox .label{color:#a9c3cc}
+#rockTotal{color:#b9c9ce}
+.treasury .rlist{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:start}
+@media (max-width:640px){.treasury .rlist{grid-template-columns:1fr}}
+.rcol{display:grid;gap:6px;align-content:start}
+.rcolhead{display:flex;justify-content:space-between;align-items:center;gap:6px;padding-bottom:4px;border-bottom:1px solid #33464d}
+.rcolhead .small{color:#a9b9be}
+.treasury .rk{border:1px solid #23323a;border-radius:4px;padding:8px 10px;background:rgba(0,0,0,.3)}
+.treasury .rk small{color:#a9b9be}
+@media (max-width:900px){.treasury .tleft{display:contents!important}.treasury .vault{order:1}.treasury .tleft+div{order:2}.treasury .rockbox{order:3}}
+@media (max-width:560px){.treasury{padding:12px}.vault{padding:10px}.treasury .brow{grid-template-columns:96px minmax(0,1fr) 22px}}
+
+/* hub link (added on import into OSRS Tools) */
+.hublink{display:inline-block;margin:0 0 10px;font-size:.85rem;color:var(--muted);text-decoration:none}
+.hublink:hover{color:var(--yellow)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="hublink" href="../">&larr; OSRS Tools</a>
+  <header class="forge">
+    <div class="embers" aria-hidden="true"><i style="left:6%;animation-delay:0.0s;animation-duration:5.2s"></i><i style="left:14%;animation-delay:2.1s;animation-duration:6.1s"></i><i style="left:23%;animation-delay:4.0s;animation-duration:4.8s"></i><i style="left:31%;animation-delay:1.2s;animation-duration:5.6s"></i><i style="left:44%;animation-delay:3.3s;animation-duration:6.4s"></i><i style="left:52%;animation-delay:0.6s;animation-duration:5.0s"></i><i style="left:61%;animation-delay:2.7s;animation-duration:5.8s"></i><i style="left:70%;animation-delay:4.6s;animation-duration:6.2s"></i><i style="left:78%;animation-delay:1.6s;animation-duration:4.9s"></i><i style="left:87%;animation-delay:3.8s;animation-duration:5.5s"></i><i style="left:94%;animation-delay:0.9s;animation-duration:6.0s"></i></div>
+    <div class="plate">
+      <span class="rivet" style="top:9px;left:9px"></span><span class="rivet" style="top:9px;right:9px"></span><span class="rivet" style="bottom:9px;left:9px"></span><span class="rivet" style="bottom:9px;right:9px"></span>
+      <h1><span class="kicker">Giants' Foundry</span><span class="etch">Foundry Planner</span></h1>
+      <p class="sub">18 mithril + 10 adamant bars per sword · Aneirin's Armour (Prifddinas) and the Cam Torum Blacksmith</p>
+    </div>
+    <label class="field slotplate" for="slots"><span class="label">Inventory space</span>
+      <span class="stepper"><button class="sb" type="button" data-step="slots" data-d="-1" aria-label="One less slot">−</button><input id="slots" type="number" min="1" max="40"><button class="sb" type="button" data-step="slots" data-d="1" aria-label="One more slot">+</button></span>
+    </label>
+  </header>
+
+  <section class="panel goal" aria-label="Smithing goal">
+    <div class="furnace"><div class="mouth"><div class="ghead">
+      <div class="tile user"><label class="label" for="g_user">Username</label>
+        <div class="row"><input type="text" id="g_user" autocomplete="off" spellcheck="false" placeholder="Your RSN"><button class="btn" type="button" id="g_go">Look up</button></div></div>
+      <div class="tile"><label class="label" for="g_xp">Smithing XP</label>
+        <div class="row"><input type="number" id="g_xp" min="0" max="200000000"></div></div>
+      <div class="tile"><span class="label">Smithing level</span><div class="val" id="g_lvl"></div><small id="g_lvlsub"></small></div>
+      <div class="tile"><label class="label" for="g_goal">Goal level</label>
+        <div class="row"><span class="stepper"><button class="sb" type="button" data-step="goal" data-d="-1" aria-label="Goal down">−</button><input id="g_goal" type="number" min="2" max="99"><button class="sb" type="button" data-step="goal" data-d="1" aria-label="Goal up">+</button></span></div></div>
+      <div class="tile"><span class="label">Goal XP</span><div class="val" id="g_goalxp"></div><small id="g_goalsub"></small></div>
+    </div>
+
+    <div class="lvlbar">
+      <div class="cap" id="g_cap"></div>
+      <div class="bigbar" id="g_bar"></div>
+      <svg class="lens" id="g_lens" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><polygon points="0,0 0,0 100,10 0,10"/></svg>
+      <div class="zoom" id="g_zoom"></div>
+    </div>
+    </div><div class="sill" aria-hidden="true"></div></div>
+
+    <div class="mslide">
+      <div class="mval"><small>Mistakes per trip</small><span id="g_mn"></span></div>
+      <div class="rangewrap">
+        <input type="range" class="mist" id="g_mist" min="0" max="12" step="1" aria-label="Mistakes per 4-sword trip">
+        <div class="ticks" aria-hidden="true"><span class="tp" style="left:0;transform:translateX(-12px)">Perfect</span><span class="tf" style="left:16.7%">Fine</span><span class="tb" style="left:45.8%">Bad</span><span class="tx" style="left:83.3%">Blatant</span></div>
+      </div>
+      <div class="mread" id="g_mread"></div>
+    </div>
+
+    <div class="goalbar" id="g_goalbar"></div>
+    <p class="muted status" id="g_status"></p>
+  </section>
+
+  <!-- 1. armory + counter -->
+  <div class="top" id="top">
+    <section class="armory" aria-label="Inventory">
+      <div class="armhead"><h2 class="plaque">Armory</h2><button class="stone" type="button" id="clearInv">Clear</button></div>
+      <div id="inv"></div>
+      <div class="quarter" id="loadbox"></div>
+      <p class="armnote">Click a piece to add one, right-click to remove one. The “+” stock button adds one world's full stock.</p>
+    </section>
+
+    <aside class="counter" aria-label="Counter">
+      <section class="till" aria-label="Swords in inventory" id="readout"></section>
+      <section class="till" aria-label="Cost for more swords" id="costbox"></section>
+    </aside>
+  </div>
+
+  <!-- 2. rune treasury -->
+  <section class="treasury" aria-label="Rune alching">
+    <div class="trhead"><h2 class="plaque rune">Rune Treasury</h2><span class="trsub">Rune ore in, high alch gold out</span></div>
+    <div class="rgrid">
+      <div class="tleft" style="display:grid;gap:14px;min-width:0;align-content:start">
+      <div class="vault" style="display:grid;gap:14px;min-width:0">
+        <div class="fields">
+          <label class="field" for="r_bars"><span class="label">Runite bars (or ore)</span>
+            <span class="stepper"><button class="sb" type="button" data-step="r_bars" data-d="-1" aria-label="One less bar">−</button><input id="r_bars" type="number" min="0"><button class="sb" type="button" data-step="r_bars" data-d="1" aria-label="One more bar">+</button></span></label>
+          <label class="field" for="r_trip"><span class="label">Bars per inventory</span>
+            <span class="stepper"><button class="sb" type="button" data-step="r_trip" data-d="-1" aria-label="One less slot">−</button><input id="r_trip" type="number" min="1" max="28"><button class="sb" type="button" data-step="r_trip" data-d="1" aria-label="One more slot">+</button></span></label>
+          <label class="field" for="r_lvl"><span class="label">Smithing level</span>
+            <span class="stepper"><button class="sb" type="button" data-step="r_lvl" data-d="-1" aria-label="Level down">−</button><input id="r_lvl" type="number" min="85" max="99"><button class="sb" type="button" data-step="r_lvl" data-d="1" aria-label="Level up">+</button></span></label>
+          <label class="field" for="r_nat"><span class="label">Nature rune price</span><input id="r_nat" type="number" min="0" style="width:5.5em"></label>
+          <label class="field" for="r_coal"><span class="label">Coal price (Ordan)</span><input id="r_coal" type="number" min="0" style="width:5.5em"></label>
+          <div class="field"><span class="label">Smith</span><div class="seg" role="group" aria-label="Smithing mode"><button type="button" data-mode="single">Single item</button><button type="button" data-mode="mix">Multiple items</button></div></div>
+        </div>
+        <div class="bars" id="r_bars_chart"></div>
+        <div class="chartfoot"><p class="vnote" id="r_hint"></p><button class="stone" type="button" id="r_all"></button></div>
+        <p class="vnote">Nature runes are 180 each at Amlodd's Magical Supplies in Prifddinas (250 per world, the price barely moves). Coal is 67 each from Ordan at the Blast Furnace. Rankings and totals are after nature runes and coal.</p>
+      </div>
+        <div class="rockbox">
+        <div class="head"><span class="label">Runite rocks</span><span class="small" id="rockTotal"></span></div>
+        <div class="rlist" id="rockBody"></div>
+        <p class="small vnote">Wilderness left out. Runite respawns in about 12 minutes, so hop worlds between spots.</p>
+      </div>
+      </div>
+      <div style="display:grid;gap:14px;min-width:0;align-content:start">
+        <div class="ledger" id="r_sum"></div>
+        <div class="mixbox ledger" id="mixbox">
+          <div class="head"><span class="label">Your inventory</span><span id="mixUsed"></span></div>
+          <div class="hlist" id="mixBody"></div>
+          <div class="hfoot"><button class="brass" type="button" id="mixBest">Best mix</button><button class="stone" type="button" id="mixClear">Clear</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+"use strict";
+var T_M=18,T_A=10,BASE_SLOTS=28,TRIP=4;
+
+/* ---------- data ---------- */
+var ITEMS=[
+ {id:"m_body", m:"m",t:"body", name:"Platebody", bars:4,price:5200, stock:4,shop:"Prifddinas"},
+ {id:"m_legs", m:"m",t:"legs", name:"Platelegs", bars:2,price:2600, stock:4,shop:"Prifddinas"},
+ {id:"m_ham",  m:"m",t:"ham",  name:"Warhammer", bars:2,price:1660, stock:3,shop:"Cam Torum"},
+ {id:"a_body", m:"a",t:"body", name:"Platebody", bars:4,price:16640,stock:3,shop:"Prifddinas"},
+ {id:"a_legs", m:"a",t:"legs", name:"Platelegs", bars:2,price:6400, stock:3,shop:"Prifddinas"},
+ {id:"a_ham",  m:"a",t:"ham",  name:"Warhammer", bars:2,price:4120, stock:2,shop:"Cam Torum"}
+];
+var RUNE=[
+ ["dagger","Rune dagger",85,1,4800],["axe","Rune axe",86,1,7680],["mace","Rune mace",87,1,8640],
+ ["medhelm","Rune med helm",88,1,11520],["sword","Rune sword",89,1,12480],["scim","Rune scimitar",90,2,15360],
+ ["limbs","Runite limbs",91,1,9600],["long","Rune longsword",91,2,19200],["fullhelm","Rune full helm",92,2,21120],
+ ["sq","Rune sq shield",93,2,23040],["wham","Rune warhammer",94,3,24900],["baxe","Rune battleaxe",95,3,24960],
+ ["chain","Rune chainbody",96,3,30000],["kite","Rune kiteshield",97,3,32640],["claws","Rune claws",98,2,7200],
+ ["2h","Rune 2h sword",99,3,38400],["legs","Rune platelegs",99,3,38400],["skirt","Rune plateskirt",99,3,38400],
+ ["body","Rune platebody",99,5,39000]
+].map(function(r){return {id:r[0],name:r[1],lvl:r[2],bars:r[3],ha:r[4]};});
+var ROCKS=[
+ ["Trahaearn mine, Prifddinas",4,"Prifddinas teleport, walk to the south-east entrance","s"],
+ ["Mining Guild",2,"Skills necklace (Mining Guild) or Falador teleport","s"],
+ ["Myths' Guild basement",2,"Mythical cape teleport","s"],
+ ["Mourner Tunnels",1,"Slayer ring teleports straight in","s"],
+ ["South Mor Ul Rek mine",3,"Fairy ring BLP to the TzHaar City, into Mor Ul Rek","m"],
+ ["Heroes' Guild basement",2,"Games necklace to Burthorpe, short walk","m"],
+ ["Fossil Island",2,"Digsite pendant to Fossil Island, then mushtrees","m"],
+ ["Grimstone",3,"Fairy ring DLP after your first mooring","m"],
+ ["Wyrmscraig (cavern 1, surface 1)",2,"Sail there; after Fallen From Grace use necklace of passage or slayer ring","m"],
+ ["Ynysdail Cavern",2,"Prifddinas, then the north rowboat","l"],
+ ["Central Fremennik Isles",1,"Rellekka ferry to Neitiznot, north-east bridges (ice trolls)","l"],
+ ["The Stranglewood",1,"Fairy ring BLS, then the rowboat","l"]
+];
+
+/* ---------- state ---------- */
+function blank(){var o={};ITEMS.forEach(function(i){o[i.id]=0;});return o;}
+var S={inv:blank(),slots:BASE_SLOTS,cheapN:2,costN:10,user:"",xp:7944614,goal:99,bars:100,lvl:94,nat:180,pick:"",trip:27,mist:0,mode:"single",mix:{},showAll:false,coal:67};
+try{var saved=JSON.parse(localStorage.getItem("gfp-v2")||"null");if(saved&&typeof saved==="object"){for(var k in saved)S[k]=saved[k];S.inv=Object.assign(blank(),saved.inv||{});S.mix=saved.mix||{};delete S.have;}}catch(e){}
+function save(){try{localStorage.setItem("gfp-v2",JSON.stringify(S));}catch(e){}}
+function $(id){return document.getElementById(id);}
+function int(v,lo,hi){v=Math.round(Number(v));if(!isFinite(v))v=lo;return Math.max(lo,Math.min(hi,v));}
+function gp(n){return Math.round(n).toLocaleString("en-US");}
+
+/* ---------- pictures (simple drawings, tinted per metal) ---------- */
+/* faceted armour icons: light left plane, base right plane, highlight band on top, shade band at the bottom */
+var PIC_N=0;
+var PIC_PAL={m:{base:"#3F3F5D",dkk:"#131322",lt:"#6c6c98",hi:"#b4b4dc"},a:{base:"#455645",dkk:"#141c14",lt:"#6f8a6f",hi:"#bcd6bc"}};
+var PIC_SHAPE={
+ body:{d:"M11 8L21 8L22 27L10 27Z M4 9.5Q6 5 11.5 5.5L12.5 12.5L5 14.5Z M28 9.5Q26 5 20.5 5.5L19.5 12.5L27 14.5Z M13 6H19L18 8.5H14Z",top:10.5,bot:21,det:"M5 14.5L12.5 12.5M27 14.5L19.5 12.5"},
+ legs:{d:"M8 4H24V7H8Z M7.5 7H15.5L15 14H6.5Z M16.5 7H24.5L25.5 14H17Z M8 14H15L14 28H9Z M17 14H24L23 28H18Z",top:8,bot:22,det:"M6.5 14H15M17 14H25.5"},
+ ham:{d:"M4 5.5H9V13.5H4Z M9 7.5H20V11.5H9Z M20 7L28.5 11.2L20 12Z",top:9.5,bot:11.8,handle:"M13 11.5H16V29.5H13Z"}
+};
+function pic(t,m){
+  var P=PIC_PAL[m],S=PIC_SHAPE[t],c="pc"+(++PIC_N),x="",defs='<clipPath id="'+c+'"><path d="'+S.d+'"/></clipPath>';
+  if(S.handle){defs+='<clipPath id="'+c+'h"><path d="'+S.handle+'"/></clipPath>';
+    x+='<path d="'+S.handle+'" fill="#5a3d24"/><g clip-path="url(#'+c+'h)"><path d="M14.5 0H32V32H14.5Z" fill="#3a2410"/></g>';}
+  x+='<g clip-path="url(#'+c+')"><path d="M0 0H16V32H0Z" fill="'+P.lt+'"/><path d="M16 0H32V32H16Z" fill="'+P.base+'"/>'+
+     '<path d="M0 0H32V'+S.top+'H0Z" fill="'+P.hi+'" opacity=".55"/><path d="M0 '+S.bot+'H32V32H0Z" fill="'+P.dkk+'" opacity=".6"/></g>';
+  if(S.det)x+='<path d="'+S.det+'" fill="none" stroke="'+P.dkk+'" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>';
+  x+='<path d="'+S.d+'" fill="none" stroke="'+P.dkk+'" stroke-width=".8" stroke-linejoin="round"/>';
+  return '<svg viewBox="0 0 32 32" aria-hidden="true"><defs>'+defs+'</defs>'+x+'</svg>';
+}
+
+/* ---------- foundry maths ---------- */
+/* how many exact T-bar crucible loads these items can make */
+function loads(c,metal,T){
+  var p=0,t=0,h=0,bars=0;
+  ITEMS.forEach(function(i){if(i.m!==metal)return;var n=c[i.id]||0;bars+=n*i.bars;if(i.bars===4)p+=n;else if(i.bars===2)t+=n;else h+=n;});
+  var N=Math.floor(bars/T);
+  for(;N>0;N--){var F=Math.min(p,N*Math.floor(T/4));if(t+Math.floor(h/2)>=(N*T-4*F)/2)break;}
+  return {N:N,bars:bars};
+}
+function run(base,n){var s=0;for(var i=0;i<n;i++)s+=Math.floor(base*(1+0.02*i));return s;}
+function cost(c){
+  var b=0,x=0;
+  ITEMS.forEach(function(i){var n=c[i.id]||0;b+=n*i.price;x+=Math.floor(n/i.stock)*run(i.price,i.stock)+run(i.price,n%i.stock);});
+  return {base:b,real:x};
+}
+function xpQ(q){q=Math.max(0,q);return (Math.floor(q*q/73)+Math.floor(1.5*q)+1)*30;}
+var Q_MAX=89+59,XP=xpQ(Q_MAX); /* 18/10 alloy + avg mould score with every mould */
+var COINS=XP*2;
+function itemsIn(c){var n=0;ITEMS.forEach(function(i){n+=c[i.id]||0;});return n;}
+
+/* cheapest mix of items for N swords that fits in the given slots (null if nothing fits) */
+function options(metal,T,N){
+  var by=function(t){return ITEMS.filter(function(i){return i.m===metal&&i.t===t;})[0];};
+  var body=by("body"),ham=by("ham"),out=[],cap=N*Math.floor(T/4),tot=N*T;
+  for(var b=0;b<=cap;b++){var w=(tot-4*b)/2;out.push({c:b*body.price+w*ham.price,items:b+w,b:b,w:w,h:0});}
+  return out;
+}
+function cheapest(N,slots){
+  var M=options("m",T_M,N),A=options("a",T_A,N),best=null;
+  M.forEach(function(m){A.forEach(function(a){
+    var items=m.items+a.items,c=m.c+a.c;if(items>slots)return;
+    if(!best||c<best.c||(c===best.c&&items<best.items))best={m:m,a:a,c:c,items:items};});});
+  return best;
+}
+
+
+/* ---------- inventory grid ---------- */
+function buildInv(){
+  var html="";
+  [["m","Mithril"],["a","Adamant"]].forEach(function(g){
+    html+='<div class="rack '+g[0]+'"><div class="items">';
+    ITEMS.filter(function(i){return i.m===g[0];}).forEach(function(i){
+      html+='<div class="chest" id="it_'+i.id+'" data-id="'+i.id+'"><span class="lid" aria-hidden="true"><i></i></span>'+
+        '<button class="pic" type="button" data-act="inc" aria-label="Add one '+g[1]+' '+i.name.toLowerCase()+'">'+pic(i.t,i.m)+'<span class="q"></span></button>'+
+        '<div class="itxt"><div class="iname">'+i.name+'</div><div class="imeta">'+i.bars+' bar'+(i.bars>1?"s":"")+' · '+gp(i.price)+' gp<br>'+i.shop+' · '+i.stock+' per world</div></div>'+
+        '<div class="qty"><button class="sb" type="button" data-act="dec" aria-label="Remove one">−</button>'+
+        '<input type="number" min="0" id="q_'+i.id+'" aria-label="'+g[1]+' '+i.name+' count">'+
+        '<button class="sb" type="button" data-act="inc" aria-label="Add one">+</button>'+
+        '<button class="sb stock" type="button" data-act="stock" title="Add one world of stock">+'+i.stock+'</button></div></div>';
+    });
+    html+='</div><div class="shelf"><span class="tag2">'+g[1]+'</span></div></div>';
+  });
+  $("inv").innerHTML=html;
+}
+function paintInv(){
+  ITEMS.forEach(function(i){
+    var n=S.inv[i.id]||0,box=$("it_"+i.id);
+    box.classList.toggle("on",n>0);
+    box.querySelector(".q").textContent=n?n:"";
+    var inp=$("q_"+i.id);if(document.activeElement!==inp)inp.value=n;
+  });
+}
+function setItem(id,n){S.inv[id]=int(n,0,999);save();paintInv();paintReadout();}
+
+$("inv").addEventListener("click",function(e){
+  var b=e.target.closest("button[data-act]");if(!b)return;
+  var id=b.closest(".chest").dataset.id,n=S.inv[id]||0,a=b.dataset.act;
+  setItem(id,a==="inc"?n+1:a==="dec"?n-1:n+ITEMS.filter(function(i){return i.id===id;})[0].stock);
+});
+$("inv").addEventListener("contextmenu",function(e){
+  var b=e.target.closest(".pic");if(!b)return;e.preventDefault();
+  var id=b.closest(".chest").dataset.id;setItem(id,(S.inv[id]||0)-1);
+});
+$("inv").addEventListener("input",function(e){
+  if(!e.target.matches("input"))return;var id=e.target.closest(".chest").dataset.id;
+  if(e.target.value==="")return;setItem(id,e.target.value);
+});
+$("inv").addEventListener("change",function(e){if(e.target.matches("input"))paintInv();});
+$("clearInv").addEventListener("click",function(){S.inv=blank();save();paintInv();paintReadout();});
+
+/* ---------- readout ---------- */
+function paintReadout(){
+  var c=S.inv,m=loads(c,"m",T_M),a=loads(c,"a",T_A),sw=Math.min(m.N,a.N),items=itemsIn(c),k=cost(c);
+  var coins=sw*COINS,net=coins-k.real,over=items-S.slots;
+  var exact=sw>0&&m.bars===T_M*sw&&a.bars===T_A*sw;
+  var packM=m.N<Math.floor(m.bars/T_M),packA=a.N<Math.floor(a.bars/T_A);
+  var pill=items===0?'<span class="pill warn">Empty</span>':exact?'<span class="pill good">Exactly 18/10, nothing spare</span>':sw?'<span class="pill good">18/10 reached</span>':'<span class="pill warn">Below 18/10</span>';
+  if(packM||packA)pill+=' <span class="pill bad">Each sword needs one 2-bar '+(packM?"mith":"addy")+' item</span>';
+  function spare(n){return n>0?'<small>+'+n+' spare</small>':'';}
+  $("readout").innerHTML=
+   '<div class="tillhead"><span class="label">Swords in inventory</span></div>'+
+   '<div class="big"><b id="swordCount">'+sw+'</b><span>'+pill+'</span></div>'+
+   '<div class="barsum"><div class="m"><span class="label">Mithril bars</span><b>'+m.bars+'</b>'+spare(m.bars-T_M*sw)+'</div>'+
+   '<div class="a"><span class="label">Adamant bars</span><b>'+a.bars+'</b>'+spare(a.bars-T_A*sw)+'</div></div>'+
+   '<div class="banner"><dl class="kv">'+
+    '<dt>Inventory used</dt><dd class="'+(over>0?"bad":"")+'">'+items+' / '+S.slots+(over>0?" (over by "+over+")":"")+'</dd>'+
+    '<dt>Cost</dt><dd>'+gp(k.real)+'</dd>'+
+    '<dt>Cost per sword</dt><dd>'+(sw?gp(k.real/sw):"—")+'</dd>'+
+    '<dt>Kovac pays</dt><dd class="good">'+gp(coins)+'</dd>'+
+    '<dt>Net profit</dt><dd class="'+(net<0?"bad":"good")+'">'+(net>0?"+":"")+gp(net)+'</dd>'+
+    '<dt>Smithing XP</dt><dd>'+gp(sw*XP)+'</dd>'+
+   '</dl></div>'+
+   '<p class="tillnote">Cost includes the 2% price rise per item on each world. XP and coins assume no mistakes and every mould unlocked.</p>';
+  $("costbox").innerHTML='<div class="tillhead"><span class="label">Cost for more swords</span></div>'+costBlock(sw,k.real);
+  $("loadbox").innerHTML='<div class="qhead"><span class="label">Cheapest load</span><span class="stepper"><button class="sb" type="button" data-step="cheapN" data-d="-1" aria-label="One fewer sword">−</button><input id="cheapN" type="number" min="1" max="99" aria-label="Swords to load"><button class="sb" type="button" data-step="cheapN" data-d="1" aria-label="One more sword">+</button></span>'+
+   '<span class="label">swords</span><button class="brass" type="button" id="loadCheap">Load cheapest</button></div>'+
+   '<p class="qnote" id="cheapNote">'+cheapNote()+'</p>'+overflowNote();
+  $("cheapN").value=S.cheapN;if($("costN"))$("costN").value=S.costN;
+}
+function costBlock(sw,spent){
+  var n=S.costN,per=sw?spent/sw:0,tot=per*n,back=n*COINS;
+  var head='<div class="cheap"><span class="stepper"><button class="sb" type="button" data-step="costN" data-d="-1" aria-label="One fewer sword">−</button><input id="costN" type="number" min="1" max="999" aria-label="Number of swords to price"><button class="sb" type="button" data-step="costN" data-d="1" aria-label="One more sword">+</button></span><span class="label">swords of this mix</span><button class="stone" type="button" id="costToGoal" title="Set to the swords needed for your goal">To goal ('+gp(goalSwords())+')</button></div>';
+  if(!sw)return head+'<p class="tillnote">Add enough armour for one full sword to price this mix.</p>';
+  return head+'<div class="banner"><dl class="kv">'+
+    '<dt>Armour cost</dt><dd>'+gp(tot)+'</dd>'+
+    '<dt>Kovac pays</dt><dd class="good">'+gp(back)+'</dd>'+
+    '<dt>Net profit</dt><dd class="'+(back-tot<0?"bad":"good")+'">'+(back-tot>0?"+":"")+gp(back-tot)+'</dd>'+
+    '<dt>Smithing XP</dt><dd>'+gp(n*XP)+'</dd></dl></div>'+
+    '<p class="tillnote">Uses this inventory\'s cost per sword ('+gp(per)+'), repeated '+n+' time'+(n>1?"s":"")+'.</p>';
+}
+function mixText(p){
+  var parts=[];
+  [["m","mith",p.m],["a","addy",p.a]].forEach(function(x){var o=x[2],n=x[1];
+    if(o.b)parts.push(o.b+" "+n+" platebod"+(o.b>1?"ies":"y"));
+    if(o.w)parts.push(o.w+" "+n+" warhammer"+(o.w>1?"s":""));
+});
+  return parts.join(", ");
+}
+/* overload run: the second inventory has one less slot (no warhammer wielded while holding a sword) */
+function overflowNote(){
+  var sl=Math.max(1,S.slots-1),p=cheapest(S.cheapN,sl),fits=!!p;if(!p)p=cheapest(S.cheapN,Infinity);
+  var base=cheapest(S.cheapN,S.slots)||cheapest(S.cheapN,Infinity),diff=p.c-base.c;
+  return '<div class="overflow"><span class="label">Overload inventory · '+sl+' slots (one less)</span>'+
+    '<span><b class="y">'+mixText(p)+'</b></span>'+
+    '<span class="muted">'+S.cheapN+' sword'+(S.cheapN>1?"s":"")+' · '+p.items+' items · '+gp(p.c)+' gp'+(diff>0?' ('+gp(diff)+' more than the full inventory)':'')+
+    (fits?'':' · <span class="bad">over '+sl+' slots by '+(p.items-sl)+'</span>')+'</span></div>';
+}
+function cheapNote(){
+  var p=cheapest(S.cheapN,S.slots),fits=!!p;if(!p)p=cheapest(S.cheapN,Infinity);
+  return "Fills the inventory above with the cheapest "+S.cheapN+"-sword mix: "+p.items+" items, "+gp(p.c)+" gp at base price."+
+    (fits?"":' <span class="bad">That is '+(p.items-S.slots)+' more than your '+S.slots+' slots, so it takes more than one trip.</span>');
+}
+$("top").addEventListener("click",function(e){
+  if(e.target.closest("#costToGoal")){syncCost();return;}
+  if(e.target.closest("#loadCheap")){
+    var p=cheapest(S.cheapN,S.slots)||cheapest(S.cheapN,Infinity),c=blank();
+    c.m_body=p.m.b;c.m_ham=p.m.w;c.a_body=p.a.b;c.a_ham=p.a.w;
+    S.inv=c;save();paintInv();paintReadout();return;
+  }
+});
+$("top").addEventListener("change",function(e){
+  if(e.target.id==="cheapN"){S.cheapN=int(e.target.value,1,99);save();paintReadout();}
+  if(e.target.id==="costN"){S.costN=int(e.target.value,1,999);save();paintReadout();}
+});
+
+/* ---------- rune alching ---------- */
+var COAL_BF=4; /* Blast Furnace: 1 runite ore + 4 coal (half the normal 8) */
+function coalBar(){return COAL_BF*S.coal;}
+function itemNet(r){return r.ha-S.nat-r.bars*coalBar();}
+function netPerBar(r){return itemNet(r)/r.bars;}
+function paintRune(){
+  var lvl=S.lvl,open=RUNE.filter(function(r){return r.lvl<=lvl;});
+  var ranked=RUNE.slice().sort(function(x,y){return netPerBar(y)-netPerBar(x);});
+  var bestOpen=ranked.filter(function(r){return r.lvl<=lvl;})[0];
+  var pick=RUNE.filter(function(r){return r.id===S.pick&&r.lvl<=lvl;})[0]||bestOpen;S.pick=pick.id;
+  var trip=S.trip,mix=S.mode==="mix";
+  function invNet(r){return Math.floor(trip/r.bars)*itemNet(r);}
+  var score=mix?netPerBar:invNet;
+  var openR=RUNE.filter(function(r){return r.lvl<=lvl;}).sort(function(x,y){return score(y)-score(x);});
+  var shown=S.showAll?RUNE.slice().sort(function(x,y){return score(y)-score(x);}):openR.filter(function(r,i){return i<3||(mix?S.mix[r.id]>0:r.id===pick.id);});
+  var max=Math.max.apply(null,shown.map(score).concat([1]));
+  $("r_all").textContent=S.showAll?"Show top 3":"Show all "+RUNE.length;
+  $("r_bars_chart").innerHTML=shown.map(function(r){
+    var v=score(r),w=Math.max(0,v/max*100),locked=r.lvl>lvl,rank=openR.indexOf(r);
+    return '<button type="button" class="brow'+((S.mode==="mix"?S.mix[r.id]>0:r.id===pick.id)?" sel":"")+'" data-pick="'+r.id+'"'+(locked?" disabled":"")+'>'+
+     '<span class="nm">'+(S.mode==="mix"&&S.mix[r.id]&&!locked?'<em class="cnt">×'+S.mix[r.id]+'</em>':'')+r.name.replace(/^Rune(ite)? /,"")+'<small>Lv '+r.lvl+(locked?" (locked)":"")+' · '+r.bars+' bar'+(r.bars>1?"s":"")+' · alch '+gp(r.ha)+'</small></span>'+
+     '<span class="btrack"><i style="width:'+w.toFixed(1)+'%"></i><span style="'+(w>55?"right:"+(101-w).toFixed(1)+"%":"left:"+(w+1).toFixed(1)+"%")+'">'+gp(v)+(mix?' / bar':' / inventory')+'</span></span>'+(rank>=0&&rank<3?'<em class="rank">'+(rank+1)+'</em>':'<span></span>')+'</button>';
+  }).join("");
+  var best=bestMix(trip,lvl),plan=S.mode==="mix"?planOf(S.mix,lvl):planOf(single(pick,trip),lvl);
+  var full=Math.floor(S.bars/trip),rem=S.bars-full*trip,used=Math.min(plan.used,trip);
+  var last=S.mode==="mix"?planOf(bestMix(rem,lvl),lvl):planOf(single(pick,rem),lvl);
+  var tot=full*plan.net+last.net,totItems=full*plan.items+last.items,totBars=full*plan.used+last.used,totXp=totBars*75,totCoal=totBars*COAL_BF;
+  function coalNote(c){return gp(c)+' coal · '+gp(c*S.coal)+' gp · '+(Math.ceil(c/27))+' inventor'+(Math.ceil(c/27)===1?"y":"ies")+' of 27 · '+Math.ceil(c/100)+' Ordan world'+(Math.ceil(c/100)===1?"":"s");}
+  var gain=best.net-plan.net,over=plan.used>trip;
+  $("r_sum").innerHTML='<span class="label">Per inventory of '+trip+' bars</span>'+
+   '<div class="big"><b style="font-size:2.4rem">'+gp(plan.net)+'</b><span class="muted">gp net after supplies</span></div>'+
+   '<span class="muted small">'+(plan.items?mixLine(plan):"Nothing smithed yet")+(trip-plan.used>0?' · '+(trip-plan.used)+' bar'+(trip-plan.used>1?"s":"")+' unused':'')+'</span>'+
+   (over?'<span class="pill bad">'+plan.used+' bars, over by '+(plan.used-trip)+'</span>':gain>0?'<span class="pill warn">Best mix gives '+gp(gain)+' more: '+mixLine(best.plan)+'</span>':'<span class="pill good">Best possible for '+trip+' bars at level '+lvl+'</span>')+
+   '<dl class="kv"><dt>High alch</dt><dd class="good">'+gp(plan.ha)+'</dd>'+
+   '<dt>Nature runes ('+gp(plan.items)+')</dt><dd class="bad">−'+gp(plan.nat)+'</dd>'+
+   '<dt>Coal ('+gp(plan.coalN)+')</dt><dd class="bad">−'+gp(plan.coal)+'</dd>'+
+   '<dt>Smithing XP</dt><dd>'+gp(plan.used*75)+'</dd></dl>'+
+   '<div class="coalbox"><i aria-hidden="true"></i><span><b>Coal for this inventory</b>'+coalNote(plan.coalN)+'</span></div>'+
+   '<hr><span class="label">All '+gp(S.bars)+' bars · '+full+' inventor'+(full===1?"y":"ies")+(rem?' + '+rem+' bars':'')+'</span>'+
+   '<dl class="kv"><dt>Net gp after supplies</dt><dd class="good">'+gp(tot)+'</dd>'+
+   '<dt>Items to alch</dt><dd>'+gp(totItems)+'</dd>'+
+   '<dt>Nature runes needed</dt><dd>'+gp(totItems)+'</dd>'+
+   '<dt>Nature rune cost</dt><dd class="bad">−'+gp(totItems*S.nat)+'</dd>'+
+   '<dt>Coal needed</dt><dd>'+gp(totCoal)+'</dd>'+
+   '<dt>Coal cost</dt><dd class="bad">−'+gp(totCoal*S.coal)+'</dd>'+
+   '<dt>Smithing XP</dt><dd>'+gp(totXp)+'</dd>'+
+   '<dt>Foundry swords funded</dt><dd>~'+gp(Math.floor(tot/35540))+'</dd></dl>'+
+   '<p class="muted small">'+(rem?'The last '+rem+' bars use the '+(S.mode==="mix"?"best mix":"same item")+'. ':'')+'Coal is '+COAL_BF+' per bar at the Blast Furnace (half of 8). Ordan sells it at a flat '+gp(S.coal)+' gp, 100 per world. Swords funded uses the cheapest load, 35,540 gp each.</p>';
+  document.querySelectorAll("[data-mode]").forEach(function(b){b.classList.toggle("on",b.dataset.mode===S.mode);});
+  $("r_hint").textContent=S.mode==="mix"?"Top 3 by gp per bar for building a mix. Click to add one, right-click to take one out.":"Top 3 for "+trip+" bars, ranked by gp per inventory after natures and coal. Click one to smith it.";
+  $("mixbox").hidden=S.mode!=="mix";
+  if(S.mode==="mix")paintMix(lvl,plan,trip);
+  ["bars","trip","lvl","nat","coal"].forEach(function(k){var el=$("r_"+k);if(document.activeElement!==el)el.value=S[k];});
+}
+function short(r){return r.name.replace(/^Rune(ite)? /,"");}
+function single(r,bars){var o={};o[r.id]=Math.floor(bars/r.bars);return o;}
+function planOf(c,lvl){
+  var p={used:0,items:0,ha:0,nat:0,net:0,list:[]};
+  RUNE.forEach(function(r){var n=c[r.id]||0;if(!n||r.lvl>lvl)return;p.used+=n*r.bars;p.items+=n;p.ha+=n*r.ha;p.list.push([r,n]);});
+  p.nat=p.items*S.nat;p.coalN=p.used*COAL_BF;p.coal=p.coalN*S.coal;p.net=p.ha-p.nat-p.coal;return p;
+}
+function plural(n,w){return n>1&&!/s$/.test(w)?(/y$/.test(w)?w.slice(0,-1)+"ies":w+"s"):w;}
+function mixLine(p){return p.list.map(function(x){return x[1]+" "+plural(x[1],short(x[0]));}).join(" + ");}
+/* most gp for a bar budget: unbounded knapsack over the unlocked items */
+function bestMix(T,lvl){
+  var open=RUNE.filter(function(r){return r.lvl<=lvl&&itemNet(r)>0;}),v=[0],pick=[null];
+  for(var b=1;b<=T;b++){v[b]=v[b-1];pick[b]=null;
+    open.forEach(function(r){if(r.bars<=b){var x=v[b-r.bars]+itemNet(r);if(x>v[b]){v[b]=x;pick[b]=r;}}});}
+  var c={},b=T;while(b>0){if(pick[b]){c[pick[b].id]=(c[pick[b].id]||0)+1;b-=pick[b].bars;}else b--;}
+  var p=planOf(c,lvl);c.net=p.net;c.plan=p;return c;
+}
+function paintMix(lvl,plan,trip){
+  var rows=plan.list;
+  $("mixBody").innerHTML=rows.length?rows.map(function(x){var r=x[0],n=x[1];
+    return '<div class="hrow on" data-id="'+r.id+'"><span class="hn">'+short(r)+'<small>'+r.bars+' bar'+(r.bars>1?"s":"")+' each</small></span>'+
+     '<span class="stepper"><button class="sb" type="button" data-h="-1" aria-label="Remove one">−</button><input type="number" min="0" value="'+n+'" aria-label="'+r.name+' count"><button class="sb" type="button" data-h="1" aria-label="Add one">+</button></span>'+
+     '<span class="t">'+gp(n*itemNet(r))+'</span></div>';}).join(""):'<p class="muted small" style="margin:8px 4px">Click bars on the left to add items, or press Best mix.</p>';
+  var u=$("mixUsed");u.textContent=plan.used+" / "+trip+" bars";u.className=plan.used>trip?"bad":"";
+}
+function setMix(id,n){S.mix[id]=int(n,0,999);if(!S.mix[id])delete S.mix[id];save();paintRune();}
+function fillBest(){var b=bestMix(S.trip,S.lvl);S.mix={};RUNE.forEach(function(r){if(b[r.id])S.mix[r.id]=b[r.id];});save();paintRune();}
+$("mixBody").addEventListener("click",function(e){var b=e.target.closest("[data-h]");if(!b)return;var id=b.closest(".hrow").dataset.id;setMix(id,(S.mix[id]||0)+Number(b.dataset.h));});
+$("mixBody").addEventListener("change",function(e){if(!e.target.matches("input"))return;setMix(e.target.closest(".hrow").dataset.id,e.target.value||0);});
+$("mixBest").addEventListener("click",fillBest);
+$("mixClear").addEventListener("click",function(){S.mix={};save();paintRune();});
+document.querySelector(".seg").addEventListener("click",function(e){var b=e.target.closest("[data-mode]");if(!b)return;
+  S.mode=b.dataset.mode;if(S.mode==="mix"&&!Object.keys(S.mix).length){fillBest();return;}save();paintRune();});
+$("r_all").addEventListener("click",function(){S.showAll=!S.showAll;save();paintRune();});
+$("r_bars_chart").addEventListener("contextmenu",function(e){var b=e.target.closest("[data-pick]");if(!b||S.mode!=="mix")return;e.preventDefault();setMix(b.dataset.pick,(S.mix[b.dataset.pick]||0)-1);});
+$("r_bars_chart").addEventListener("click",function(e){var b=e.target.closest("[data-pick]");if(!b||b.disabled)return;
+  if(S.mode==="mix"){setMix(b.dataset.pick,(S.mix[b.dataset.pick]||0)+1);return;}
+  S.pick=b.dataset.pick;save();paintRune();});
+[["bars",0,100000],["trip",1,28],["lvl",85,99],["nat",0,10000],["coal",0,10000]].forEach(function(f){
+  $("r_"+f[0]).addEventListener("input",function(e){if(e.target.value==="")return;S[f[0]]=int(e.target.value,f[1],f[2]);save();paintRune();});
+  $("r_"+f[0]).addEventListener("change",function(){paintRune();});
+});
+
+/* rocks */
+function paintRocks(){
+  var cols=[["s","Close"],["m","Some walking"],["l","Long trip"]];
+  $("rockBody").innerHTML=cols.map(function(c){
+    var rs=ROCKS.filter(function(r){return r[3]===c[0];}).sort(function(a,b){return b[1]-a[1];});
+    var n=rs.reduce(function(t,r){return t+r[1];},0);
+    return '<div class="rcol"><div class="rcolhead"><span class="tag '+c[0]+'">'+c[1]+'</span><span class="small">'+rs.length+' spots · '+n+' rocks</span></div>'+
+      rs.map(function(r){return '<div class="rk"><b class="c">'+r[1]+'</b><span><span class="rn">'+r[0]+'</span><small>'+r[2]+'</small></span></div>';}).join("")+'</div>';
+  }).join("");
+  var total=ROCKS.reduce(function(s,r){return s+r[1];},0);
+  $("rockTotal").textContent=ROCKS.length+" spots · "+total+" rocks";
+}
+
+/* ---------- shared steppers + slots ---------- */
+var LIM={goal:[2,99],slots:[1,40],cheapN:[1,99],costN:[1,999],r_bars:[0,100000],r_trip:[1,28],r_lvl:[85,99]};
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-step]");if(!b)return;
+  var key=b.dataset.step,d=Number(b.dataset.d),lim=LIM[key],prop=key.indexOf("r_")===0?key.slice(2):key;
+  S[prop]=int((Number(S[prop])||0)+d,lim[0],lim[1]);save();
+  if(prop==="goal"){goalChanged();return;}
+  if(prop==="slots"){$("slots").value=S.slots;paintReadout();}
+  else if(prop==="cheapN"||prop==="costN")paintReadout();
+  else paintRune();
+});
+$("slots").addEventListener("input",function(e){if(e.target.value==="")return;S.slots=int(e.target.value,1,40);save();paintReadout();});
+$("slots").addEventListener("change",function(e){e.target.value=S.slots;});
+
+/* ---------- smithing goal + XP lookup ---------- */
+var XPT=[0,0];(function(){var pts=0;for(var l=1;l<99;l++){pts+=Math.floor(l+300*Math.pow(2,l/7));XPT[l+1]=Math.floor(pts/4);}})();
+function levelOf(xp){var l=1;while(l<99&&xp>=XPT[l+1])l++;return l;}
+function goalSwords(){return Math.max(0,Math.ceil((XPT[S.goal]-S.xp)/XP));}
+/* XP for one 4-sword trip with k mistakes (10 quality each), spread as evenly as possible */
+function tripXp(k){var t=0;for(var i=0;i<TRIP;i++){var m=Math.floor(k/TRIP)+(i<k%TRIP?1:0);t+=xpQ(Q_MAX-10*m);}return t;}
+var MIST_MAX=12;
+function tier(k){return k===0?["Perfect","p"]:k<=3?["Fine","f"]:k<=7?["Bad","b"]:["Blatant XP loss","x"];}
+function paintGoal(){
+  var xp=S.xp,lv=levelOf(xp),goalXp=XPT[S.goal],left=Math.max(0,goalXp-xp),sw=goalSwords();
+  var nx=lv<99?XPT[lv+1]:XPT[99],lo=XPT[lv],span=Math.max(1,nx-lo),pn=lv<99?(xp-lo)/span:1;
+  var k=S.mist,full=TRIP*XP,tx=tripXp(k),loss=full-tx,ti=tier(k),fr=tx/full;
+  var fw=lv<99?Math.min(full/span,1-pn):0,after=xp+tx,al=levelOf(after);
+  /* header tiles */
+  $("g_lvl").textContent=lv;
+  $("g_lvlsub").textContent=lv<99?gp(nx-xp)+" XP to "+(lv+1):"Maxed";
+  $("g_goalxp").textContent=gp(goalXp);
+  $("g_goalsub").textContent=left?gp(left)+" XP · ~"+gp(sw)+" swords":"Goal reached";
+  /* big bar */
+  $("g_cap").innerHTML=lv<99?'<span><span class="lv">'+lv+'</span> → <span class="lv">'+(lv+1)+'</span> &nbsp;<b>'+gp(nx-xp)+'</b> XP to go · <b>'+gp(Math.ceil((nx-xp)/XP))+'</b> swords</span>'+
+    '<span>One trip '+(after>=nx?'levels you to <b>'+al+'</b>':'takes you to <b>'+(100*(after-lo)/span).toFixed(1)+'%</b>')+'</span>':'<span><span class="lv">99</span> Maxed</span>';
+  $("g_bar").innerHTML='<div class="fill" style="width:'+(pn*100).toFixed(2)+'%"></div>'+
+    (fw>0?'<div class="tseg" style="left:'+(pn*100).toFixed(2)+'%;width:'+(fw*100).toFixed(2)+'%" title="One perfect trip: '+gp(full)+' XP"><div class="lane xp"><i style="width:'+(fr*100).toFixed(1)+'%"></i></div><div class="lane gp"><i style="width:'+(fr*100).toFixed(1)+'%"></i></div></div>':'')+
+    '<span class="pct">'+(pn*100).toFixed(1)+'%</span>';
+  var L=pn*100,R=(pn+Math.max(fw,.006))*100;
+  $("g_lens").style.display=fw>0?"":"none";
+  $("g_lens").querySelector("polygon").setAttribute("points",L.toFixed(2)+",0 "+R.toFixed(2)+",0 100,10 0,10");
+  $("g_zoom").innerHTML=
+   '<span class="zl">XP</span><div class="ztrack xp"><i style="width:'+(fr*100).toFixed(1)+'%"></i><span class="got">+'+gp(tx)+' XP</span>'+(loss?'<span class="lost">−'+gp(loss)+'</span>':'')+'</div>'+
+   '<span class="zl">Coins</span><div class="ztrack gp"><i style="width:'+(fr*100).toFixed(1)+'%"></i><span class="got">+'+gp(2*tx)+' gp</span>'+(loss?'<span class="lost">−'+gp(2*loss)+'</span>':'')+'</div>'+
+   '<div class="zfoot"><span>One '+TRIP+'-sword trip, zoomed in. Striped red is what the mistakes cost.</span><span>Perfect: '+gp(full)+' XP · '+gp(2*full)+' gp</span></div>';
+  /* slider */
+  if(document.activeElement!==$("g_mist"))$("g_mist").value=k;
+  $("g_mn").innerHTML='<span class="t'+ti[1]+'">'+(k===MIST_MAX?k+"+":k)+'</span>';
+  var swK=left?Math.ceil(left/(tx/TRIP)):0,extra=Math.max(0,swK-sw);
+  $("g_mread").innerHTML='<b class="t'+ti[1]+'">'+ti[0]+'</b><br>'+(k?'−'+gp(loss)+' XP · −'+gp(2*loss)+' gp ('+(100*loss/full).toFixed(1)+'%)':'Nothing lost')+
+    (k?'<span class="xtra">= '+(loss/XP).toFixed(2)+' perfect swords lost per trip'+(left?' · <b class="t'+ti[1]+'">+'+gp(extra)+'</b> extra swords to level '+S.goal:'')+'</span>':'');
+  /* goal bar */
+  var pg=goalXp<=xp?1:xp/goalXp;
+  $("g_goalbar").innerHTML='<i style="width:'+(pg*100).toFixed(1)+'%"></i><span>'+(pg*100).toFixed(1)+'% of the way to level '+S.goal+'</span>';
+  $("g_status").textContent=goalStatus||"Swords use "+gp(XP)+" XP each (18/10, no mistakes, 10 quality lost per mistake). The sword count fills “Cost for” below; you can still change it there.";
+  if(document.activeElement!==$("g_xp"))$("g_xp").value=xp;
+  if(document.activeElement!==$("g_goal"))$("g_goal").value=S.goal;
+  if(document.activeElement!==$("g_user"))$("g_user").value=S.user;
+}
+$("g_mist").addEventListener("input",function(e){S.mist=int(e.target.value,0,MIST_MAX);save();paintGoal();});
+var goalStatus="";
+function syncCost(){S.costN=Math.max(1,Math.min(999,goalSwords()||1));save();paintReadout();}
+function goalChanged(){save();paintGoal();syncCost();}
+$("g_xp").addEventListener("input",function(e){if(e.target.value==="")return;S.xp=int(e.target.value,0,200000000);goalStatus="";goalChanged();});
+$("g_goal").addEventListener("input",function(e){if(e.target.value==="")return;S.goal=int(e.target.value,2,99);goalChanged();});
+$("g_user").addEventListener("input",function(e){S.user=e.target.value.slice(0,12);save();});
+$("g_user").addEventListener("keydown",function(e){if(e.key==="Enter")lookup();});
+$("g_go").addEventListener("click",lookup);
+/* Wise Old Man reads the official hiscores and allows browser requests (the hiscores site itself does not) */
+function readXp(d){try{return d.latestSnapshot.data.skills.smithing.experience;}catch(e){return null;}}
+function lookup(){
+  var name=(S.user||"").trim();if(!name){goalStatus="Type a username first.";paintGoal();return;}
+  var url="https://api.wiseoldman.net/v2/players/"+encodeURIComponent(name);
+  goalStatus="Looking up "+name+"…";paintGoal();
+  function done(xp,fresh){
+    if(xp==null||xp<0){goalStatus="No Smithing XP found for "+name+". Check the name, or type your XP in.";paintGoal();return;}
+    S.xp=xp;goalStatus="Loaded "+name+": "+gp(xp)+" Smithing XP"+(fresh?" from the hiscores":" (last saved snapshot)")+". Edit any number to theorycraft.";
+    goalChanged();
+  }
+  function fail(){goalStatus="Couldn't reach the lookup. It works in the downloaded file in a normal browser; in the Claude app, type your XP in.";paintGoal();}
+  fetch(url,{method:"POST"}).then(function(r){return r.ok?r.json():Promise.reject(r.status);})
+   .then(function(d){done(readXp(d),true);})
+   .catch(function(){
+     fetch(url).then(function(r){return r.ok?r.json():Promise.reject(r.status);})
+      .then(function(d){done(readXp(d),false);})
+      .catch(function(st){if(st===404){goalStatus="No player called "+name+" on the hiscores.";paintGoal();}else fail();});
+   });
+}
+
+/* ---------- start ---------- */
+buildInv();
+if(itemsIn(S.inv)===0){S.inv.m_body=8;S.inv.m_legs=2;S.inv.m_ham=3;S.inv.a_body=4;S.inv.a_legs=2;S.inv.a_ham=1;} /* example haul on first open */
+$("slots").value=S.slots;
+paintInv();paintReadout();paintRune();paintRocks();paintGoal();
+})();
+</script>
+</body>
+</html>

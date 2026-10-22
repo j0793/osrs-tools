@@ -12,11 +12,15 @@ osrs-tools/
 ├── CHANGELOG.md        Repo-wide changes
 ├── shared/theme.css    Shared look for the hub and every tool
 ├── market-analyzer/    GE Market Analyzer
-├── ca-tracker/         Combat Achievements Tracker (pending import)
-└── foundry-tracker/    Giants' Foundry Tracker (pending import)
+├── ca-tracker/         Combat Achievements Tracker
+│   ├── desktop/        Original Tkinter app and the wiki scraper (archived, still runs)
+│   └── worker/         Cloudflare Worker that relays WikiSync lookups (copy for the record)
+└── foundry-tracker/    Giants' Foundry Planner
 ```
 
 Every tool folder has its own `index.html`, `README.md` and `CHANGELOG.md`.
+
+Tools that were built before this repo existed have changelogs reconstructed from their build conversations and old commits, with dates and the versions assigned afterwards.
 
 ## Versioning and changelogs
 

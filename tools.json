@@ -13,19 +13,19 @@
       "id": "ca-tracker",
       "name": "Combat Achievements Tracker",
       "path": "ca-tracker/",
-      "status": "pending-import",
-      "version": "",
-      "updated": "",
-      "description": "Tracks progress on combat achievement tasks. Waiting to be imported into this repo."
+      "status": "live",
+      "version": "1.1.0",
+      "updated": "2026-10-22",
+      "description": "Look up any account's Combat Achievements from WikiSync: completed tasks, points and distance to the next mastery tier. Includes the original desktop app."
     },
     {
       "id": "foundry-tracker",
-      "name": "Giants' Foundry Tracker",
+      "name": "Giants' Foundry Planner",
       "path": "foundry-tracker/",
-      "status": "pending-import",
-      "version": "",
-      "updated": "",
-      "description": "Giants' Foundry progress tracker. Waiting to be imported into this repo."
+      "status": "live",
+      "version": "1.0.0",
+      "updated": "2026-10-22",
+      "description": "Plans ironman Giants' Foundry hauls for 99 Smithing: cheapest shop loads, swords and XP to goal, and rune alching profit after natures and coal."
     }
   ]
 }
