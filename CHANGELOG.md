@@ -2,6 +2,12 @@
 
 Repo-wide changes: structure, shared styles, the hub page. Each tool keeps its own `CHANGELOG.md` for its own versions.
 
+## 2026-10-22 (later)
+
+### Changed
+- `market-analyzer` updated to v0.3.0 (screener direction filter, rotation recovery input). See its changelog.
+- `market-analyzer` updated to v0.2.0 (cash ledger). See its changelog.
+
 ## 2026-10-22
 
 ### Added

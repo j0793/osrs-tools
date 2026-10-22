@@ -5,9 +5,9 @@
       "name": "GE Market Analyzer",
       "path": "market-analyzer/",
       "status": "scaffold",
-      "version": "0.1.0",
+      "version": "0.3.0",
       "updated": "2026-10-22",
-      "description": "Screens Grand Exchange prices against update baselines, tracks positions and P/L after tax, and reviews trade theses."
+      "description": "Screens Grand Exchange prices against update baselines, tracks positions, cash and P/L after tax, and reviews trade theses."
     },
     {
       "id": "ca-tracker",

@@ -106,17 +106,20 @@ export function recoveryScenarios({ entry, qty, current, baseline, itemId = null
 
 /**
  * Rotation: sell something you hold now and buy something else.
- * Compares keeping the holding vs rotating into the target, if both recover
- * the same fraction of their own drops. Positive `edge` means rotating wins.
+ * Compares keeping the holding vs rotating into the target. Each row is one
+ * recovery fraction for the target. The holding recovers the same fraction,
+ * unless `holdFraction` is given — then it's fixed at that for every row
+ * (e.g. a structural holding you expect to recover only 20% of its drop).
+ * Positive `edge` means rotating wins.
  */
-export function rotationScenario({ hold, target, fractions = [0.5, 0.75, 1] }) {
+export function rotationScenario({ hold, target, fractions = [0.5, 0.75, 1], holdFraction = null }) {
   // hold:   { itemId, qty, current, baseline }
   // target: { itemId, current, baseline }
   const proceeds = netProceeds(hold.current, hold.qty, hold.itemId);
   const units = Math.floor(proceeds / target.current);
   const leftover = proceeds - units * target.current;
   return fractions.map(f => {
-    const holdSell = Math.round(recoveryPrice(hold.current, hold.baseline, f));
+    const holdSell = Math.round(recoveryPrice(hold.current, hold.baseline, holdFraction ?? f));
     const targSell = Math.round(recoveryPrice(target.current, target.baseline, f));
     const keepValue = netProceeds(holdSell, hold.qty, hold.itemId);
     const rotateValue = netProceeds(targSell, units, target.itemId) + leftover;

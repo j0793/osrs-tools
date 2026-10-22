@@ -1,5 +1,21 @@
 # GE Market Analyzer — changelog
 
+## 0.3.0 — 2026-10-22
+
+Screener no longer hides what you search for, and rotation handles structural vs cyclical items.
+
+### Fixed
+- Searching for an item that trades above its baseline (e.g. Inquisitor armor after the raid spike) returned nothing, because the "Only below baseline" filter ran before the search. The screener now says how many matches each filter is hiding, with a **Show all matches** link.
+
+### Added
+- **Direction** filter in the screener: Below baseline (dips), Above baseline (risers), or All. "Above" is how you find inverse movers. Switching direction re-sorts so the biggest move is first.
+- **Holding recovers %** in the rotation calculator. Leave it blank to assume both items recover alike; set it when your thesis says the holding won't recover (structural) and the target will (cyclical).
+- Tests for the separate holding recovery.
+
+### Changed
+- "Only below baseline" checkbox replaced by the Direction filter.
+- Items with no baseline or volume now always sort to the bottom, whichever way a column is sorted.
+
 ## 0.2.0 — 2026-10-22
 
 Cash is now tracked from your logs instead of being a fixed number.

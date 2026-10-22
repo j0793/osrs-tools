@@ -10,6 +10,7 @@ Prices come live from the [OSRS Wiki Real-time Prices API](https://oldschool.run
 Events ──► sets the baseline day (N days before the update)
    │
 Screener ──► every item vs baseline: % change, volume, buy limit, break-even
+   │           └─ Direction: dips (below), risers (above, inverse movers), or all
    │
 Item page ──► history chart, recovery scenarios, log a buy
    │
@@ -17,7 +18,8 @@ Baskets ──► your groups of related items → index (100 = baseline)
    │           └─ Thesis: dip type, expectation, entry / target / invalidation
    │                 └─ becomes rules → signals: Buy zone, Sell zone, Invalidated, Watch
    │           └─ Custom rules on any basket or item
-   │           └─ Holdings basket + rotation calculator (your liquidation list)
+   │           └─ Holdings basket + rotation calculator (your liquidation list),
+   │              with a separate expected recovery for the item you sell
    │
 Portfolio ──► open positions, P/L after tax at instant-sell price
    │           └─ Cash ledger: opening + deposits/withdrawals + buys + sells + holding sales

@@ -22,7 +22,7 @@ const market = {
 };
 const series = new Map(); // `${id}:${lookback}` → points
 const ui = {
-  q: "", sort: "pct", dir: 1, onlyDown: true, minVol: 0, showAll: false,
+  q: "", sort: "pct", dir: 1, direction: "down", minVol: 0, showAll: false,
   lookback: "30d", sellingId: null, resetArmed: false, useWhatIf: false, check: null,
 };
 
@@ -195,19 +195,32 @@ function screener() {
   const minPrice = state.settings.minPrice || 0;
   const q = ui.q.trim().toLowerCase();
   let rows = [];
+  // Search matches that a filter hid, so the screener can say so instead of silently dropping them.
+  const hidden = { price: 0, dir: 0, vol: 0 };
   for (const it of market.items) {
-    const now = nowMid(it.id);
-    if (!(now > 0) || now < minPrice) continue;
     if (q && !it.name.toLowerCase().includes(q)) continue;
+    const now = nowMid(it.id);
+    if (!(now > 0)) continue; // never traded: nothing to show
+    if (now < minPrice) { hidden.price++; continue; }
     const base = basePrice(it.id);
     const chg = C.pctChange(now, base);
-    if (ui.onlyDown && !(chg < 0)) continue;
+    if ((ui.direction === "down" && !(chg < 0)) || (ui.direction === "up" && !(chg > 0))) { hidden.dir++; continue; }
     const vr = volRatio(it.id);
-    if (ui.minVol > 0 && !(vr >= ui.minVol)) continue;
+    if (ui.minVol > 0 && !(vr >= ui.minVol)) { hidden.vol++; continue; }
     rows.push({ it, now, base, chg, rise: C.riseNeeded(now, base), vr, cap: C.capacityPer4h(it.limit, now), be: C.breakEvenSell(quote(it.id)?.low || now, it.id), sig: signalFor("item", it.id) });
   }
-  const key = { name: r => r.it.name, price: r => r.now, pct: r => r.chg ?? 999, vol: r => r.vr ?? -1, cap: r => r.cap ?? -1 }[ui.sort];
-  rows.sort((a, b) => { const x = key(a), y = key(b); return (x > y ? 1 : x < y ? -1 : 0) * ui.dir; });
+  const key = { name: r => r.it.name, price: r => r.now, pct: r => r.chg, vol: r => r.vr, cap: r => r.cap }[ui.sort];
+  rows.sort((a, b) => {
+    const x = key(a), y = key(b);
+    if (x == null || y == null) return (x == null) - (y == null); // missing values always last
+    return (x > y ? 1 : x < y ? -1 : 0) * ui.dir;
+  });
+  const hiddenNote = q && hidden.price + hidden.dir + hidden.vol > 0
+    ? `<p class="note danger">${[
+        hidden.dir && `${hidden.dir} matching item${hidden.dir > 1 ? "s are" : " is"} ${ui.direction === "down" ? "not below" : "not above"} baseline`,
+        hidden.price && `${hidden.price} below the min price`,
+        hidden.vol && `${hidden.vol} under the min volume`,
+      ].filter(Boolean).join(", ")}. <a href="#" data-act="clear-filters">Show all matches</a></p>` : "";
   const total = rows.length;
   if (!ui.showAll) rows = rows.slice(0, 150);
 
@@ -218,8 +231,13 @@ function screener() {
         <label>Search<input id="f-q" value="${esc(ui.q)}" placeholder="Item name"></label>
         <label>Min price<input id="f-minprice" value="${gp(minPrice)}" size="8"></label>
         <label>Min volume ×<input id="f-minvol" type="number" step="0.1" min="0" value="${ui.minVol}" style="width:6em"></label>
-        <label style="flex-direction:row;align-items:center;gap:6px"><input id="f-down" type="checkbox" ${ui.onlyDown ? "checked" : ""}> Only below baseline</label>
+        <label>Direction<select id="f-dir">
+          <option value="down" ${ui.direction === "down" ? "selected" : ""}>Below baseline (dips)</option>
+          <option value="up" ${ui.direction === "up" ? "selected" : ""}>Above baseline (risers)</option>
+          <option value="all" ${ui.direction === "all" ? "selected" : ""}>All</option>
+        </select></label>
       </div>
+      ${hiddenNote}
       <p class="note">Volume × compares the last 4 hours to the baseline day (1.0 = normal). Break-even is the sell price that recovers the current instant-sell price after tax.</p>
     </div>
     <div class="table-wrap" style="margin-top:12px"><table>
@@ -508,12 +526,14 @@ function rotationPanel(b) {
       const rows = C.rotationScenario({
         hold: { itemId: h.itemId, qty: h.qty || 1, current: nowSell(h.itemId), baseline: basePrice(h.itemId) },
         target: { itemId: target.id, current: quote(target.id)?.high || nowMid(target.id), baseline: basePrice(target.id) },
+        fractions: [0.25, 0.5, 0.75, 1],
+        holdFraction: r.holdRecover,
       });
       if (rows[0].units < 1) {
         table = `<p class="note danger">Selling ${h.qty || 1} × ${esc(h.name)} brings in ${gp(rows[0].proceeds)} after tax, which isn't enough for one ${esc(target.name)} at ${gp(quote(target.id)?.high || nowMid(target.id))}. Raise the quantity or pick another item.</p>`;
       } else
-      table = `<p class="note">Sell ${h.qty || 1} × ${esc(h.name)} now → ${gp(rows[0].proceeds)} after tax → ${rows[0].units.toLocaleString()} × ${esc(target.name)} at instant buy. Both assumed to recover the same share of their drop. ${target.limit ? `Buy limit: ${target.limit} per 4h, so filling takes about ${Math.ceil(rows[0].units / target.limit) * 4}h.` : ""}</p>
-      <div class="table-wrap"><table><thead><tr><th>Both recover</th><th class="num">Keep holding</th><th class="num">Rotate</th><th class="num">Edge</th></tr></thead>
+      table = `<p class="note">Sell ${h.qty || 1} × ${esc(h.name)} now → ${gp(rows[0].proceeds)} after tax → ${rows[0].units.toLocaleString()} × ${esc(target.name)} at instant buy. ${r.holdRecover == null ? "Both assumed to recover the same share of their drop." : `${esc(h.name)} assumed to recover ${Math.round(r.holdRecover * 100)}% of its drop in every row.`} ${target.limit ? `Buy limit: ${target.limit} per 4h, so filling takes about ${Math.ceil(rows[0].units / target.limit) * 4}h.` : ""}</p>
+      <div class="table-wrap"><table><thead><tr><th>${r.holdRecover == null ? "Both recover" : `${esc(target.name)} recovers`}</th><th class="num">Keep holding</th><th class="num">Rotate</th><th class="num">Edge</th></tr></thead>
       <tbody>${rows.map(x => `<tr><td>${x.fraction * 100}%</td><td class="num">${gp(x.keepValue)}</td><td class="num">${gp(x.rotateValue)}</td><td class="num ${tone(x.edge)}">${gp(x.edge)}</td></tr>`).join("")}</tbody></table></div>`;
     } else table = `<p class="note">Need current and baseline prices for both items.</p>`;
   }
@@ -522,7 +542,9 @@ function rotationPanel(b) {
     <form data-form="rotation" data-b="${b.id}" class="row">
       <label>Sell<select name="hold">${sellable.map(m => `<option value="${m.itemId}" ${r?.holdId === m.itemId ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select></label>
       <label>Buy<input name="target" list="item-names" required value="${esc(r?.targetName || "")}"></label>
-      <button>Compare</button></form>${table}</section>`;
+      <label>Holding recovers %<input name="holdRecover" type="number" min="0" max="100" step="5" style="width:6em" placeholder="same" value="${r?.holdRecover == null ? "" : Math.round(r.holdRecover * 100)}"></label>
+      <button>Compare</button></form>
+    <p class="note">Leave "Holding recovers" blank to assume both items recover alike. Set it when your thesis says they won't, e.g. 20 for a structural dip you're rotating out of.</p>${table}</section>`;
 }
 
 // ================================================================ PORTFOLIO
@@ -693,6 +715,10 @@ const actions = {
   reload() { series.clear(); loadMarket(); },
   sort(el) { const k = el.dataset.key; ui.dir = ui.sort === k ? -ui.dir : 1; ui.sort = k; render(); },
   showall(el, e) { e.preventDefault(); ui.showAll = true; render(); },
+  "clear-filters"(el, e) {
+    e.preventDefault();
+    ui.direction = "all"; ui.minVol = 0; state.settings.minPrice = 0; persist(); render();
+  },
   lookback(el) { ui.lookback = el.dataset.l; render(); },
   "add-to-basket"(el) {
     const b = state.baskets.find(x => x.id === document.getElementById("add-basket").value);
@@ -802,7 +828,11 @@ const forms = {
     state.rules.push({ id: S.uid("r_"), name: d.name.trim(), target: { kind, id: kind === "item" ? Number(id) : id }, signal: d.signal, conditions: conds, enabled: true });
     persist(); render();
   },
-  rotation(f, d) { ui.rotation = { basketId: f.dataset.b, holdId: Number(d.hold), targetName: d.target }; render(); },
+  rotation(f, d) {
+    const hr = d.holdRecover === "" ? null : Math.max(0, Math.min(100, Number(d.holdRecover))) / 100;
+    ui.rotation = { basketId: f.dataset.b, holdId: Number(d.hold), targetName: d.target, holdRecover: hr };
+    render();
+  },
   review(f, d) {
     const t = state.trades.find(x => x.id === f.dataset.id);
     t.review = { expected: d.expected, actual: d.actual, right: d.right, wrong: d.wrong, cause: d.cause };
@@ -862,7 +892,11 @@ view.addEventListener("change", e => {
   if (t.id === "f-q") { ui.q = t.value; render(); }
   else if (t.id === "f-minprice") { state.settings.minPrice = num(t.value) || 0; persist(); render(); }
   else if (t.id === "f-minvol") { ui.minVol = Number(t.value) || 0; render(); }
-  else if (t.id === "f-down") { ui.onlyDown = t.checked; render(); }
+  else if (t.id === "f-dir") {
+    ui.direction = t.value;
+    if (ui.sort === "pct") ui.dir = t.value === "up" ? -1 : 1; // biggest risers / biggest dips first
+    render();
+  }
   else if (t.id === "f-whatif") { ui.useWhatIf = t.checked; render(); }
   else if (t.dataset.qty != null) {
     const b = state.baskets.find(x => x.id === route().arg);

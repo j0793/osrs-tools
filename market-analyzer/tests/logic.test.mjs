@@ -56,6 +56,17 @@ test("rotation: selling a flat holding into a dipped item", () => {
   assert.ok(full.edge > 0);
 });
 
+test("rotation with a fixed recovery for the holding (structural vs cyclical)", () => {
+  const hold = { itemId: 1, qty: 1, current: 397_000_000, baseline: 468_000_000 }; // Elysian-like
+  const target = { itemId: 2, current: 146_000_000, baseline: 168_000_000 };       // Torva-body-like
+  const same = C.rotationScenario({ hold, target, fractions: [0.75] })[0];
+  const fixed = C.rotationScenario({ hold, target, fractions: [0.75], holdFraction: 0.2 })[0];
+  assert.equal(fixed.rotateValue, same.rotateValue);           // target side unchanged
+  assert.ok(fixed.keepValue < same.keepValue);                  // holding recovers less
+  assert.equal(fixed.keepValue, C.netProceeds(Math.round(397_000_000 + 0.2 * 71_000_000), 1, 1));
+  assert.ok(fixed.edge > same.edge);
+});
+
 test("basket index: equal weight vs quantity weight", () => {
   const now = { 1: 80, 2: 50 }, base = { 1: 100, 2: 100 };
   const eq = C.basketIndex([{ itemId: 1 }, { itemId: 2 }], id => now[id], id => base[id]);
