@@ -15,7 +15,7 @@ Screener ──► every item vs baseline: % change, volume, buy limit, break-ev
 Item page ──► history chart, recovery scenarios, log a buy
    │
 Baskets ──► your groups of related items → index (100 = baseline), 30-day chart, 7-day trend
-   │           └─ Thesis: dip type, expectation, entry / target / invalidation
+   │           └─ Thesis: dip type, direction (recover / no recovery), entry / target / invalidation
    │                 └─ becomes rules → signals: Buy zone, Sell zone, Invalidated, Watch
    │           └─ Custom rules on any basket or item
    │           └─ Holdings basket + rotation calculator (your liquidation list),
@@ -25,6 +25,7 @@ Portfolio ──► open positions, P/L after tax at instant-sell price
    │           └─ Cash ledger: opening + deposits/withdrawals + buys + sells + holding sales
    │
 Journal ──► each sell gets a review → stats by dip type and by cause
+              holdings you sold are graded by what the item did after the sale
 ```
 
 ## Files
@@ -49,6 +50,8 @@ Journal ──► each sell gets a review → stats by dip type and by cause
 - **Basket index**: 100 = baseline. *Equal* weighting = geometric mean of now ÷ baseline (every item one vote). *By value* = Σ qty × now ÷ Σ qty × baseline (blank qty = 1). Set per basket under Edit.
 - **Basket trend**: slope of the index over the last 7 days, % per day, from each member's 30-day history.
 - **Cash**: your manual entries plus every logged buy (minus) and sell (plus, after tax). Buys and sells aren't stored as cash entries; they're read from positions and trades each time, so the two can't disagree.
+- **Thesis levels by direction**: *Expect recovery*: buy at ≤ entry, take profit at ≥ target, wrong at ≤ invalidation. *Expect no recovery*: sell if it bounces to ≥ entry, played out at ≤ target, wrong at ≥ invalidation.
+- **Sell decision**: after-tax gold from selling a holding minus what the same items would bring after tax at today's instant-sell price. Positive = selling was right so far.
 - **Signal priority**: Invalidated beats Sell zone beats Buy zone beats Watch. No rule firing = Hold.
 
 ## Running the tests

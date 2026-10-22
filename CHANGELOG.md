@@ -5,6 +5,7 @@ Repo-wide changes: structure, shared styles, the hub page. Each tool keeps its o
 ## 2026-10-22 (later)
 
 ### Changed
+- `market-analyzer` updated to v0.5.0 (thesis direction and editing, holding sales graded in the Journal). See its changelog.
 - `market-analyzer` updated to v0.4.0 (basket chart and trend, edit/rename, weighting, multi-add). See its changelog.
 - `market-analyzer` updated to v0.3.0 (screener direction filter, rotation recovery input). See its changelog.
 - `market-analyzer` updated to v0.2.0 (cash ledger). See its changelog.

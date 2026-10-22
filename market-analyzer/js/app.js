@@ -34,8 +34,9 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 function gp(n) {
   if (n == null || !isFinite(n)) return "—";
   const a = Math.abs(n), s = n < 0 ? "-" : "";
-  if (a >= 1e9) return s + (a / 1e9).toFixed(2) + "b";
-  if (a >= 1e6) return s + (a / 1e6).toFixed(a >= 1e8 ? 0 : 1) + "m";
+  // thresholds sit just below each unit so rounding never shows "1000.0k" or "1000m"
+  if (a >= 999.5e6) return s + (a / 1e9).toFixed(2) + "b";
+  if (a >= 999.95e3) return s + (a / 1e6).toFixed(a >= 99.95e6 ? 0 : 1) + "m";
   if (a >= 1e4) return s + (a / 1e3).toFixed(1) + "k";
   return s + Math.round(a).toLocaleString();
 }
@@ -225,7 +226,7 @@ function render() {
   view.innerHTML = (views[name] || screener)(arg);
   if (name === "item") drawChart(Number(arg));
 }
-window.addEventListener("hashchange", () => { ui.sellingId = null; ui.sellingHolding = null; ui.editingBasket = false; render(); window.scrollTo(0, 0); });
+window.addEventListener("hashchange", () => { ui.sellingId = null; ui.sellingHolding = null; ui.editingBasket = false; ui.editingThesis = null; render(); window.scrollTo(0, 0); });
 
 function needsPrices() {
   if (market.loading || (!market.loadedAt && !market.error)) return `<div class="empty">Loading prices…</div>`;
@@ -509,8 +510,10 @@ function basketView(id) {
             <label>Quantity<input name="qty" value="${m.qty}" inputmode="numeric" style="width:6em"></label>
             <label>Price each<input name="price" value="${gp(nowSell(m.itemId))}" style="width:8em"></label>
             <label>Date<input name="date" type="date" value="${today()}"></label>
+            <label>Thesis<select name="thesis"><option value="">None</option>${thesesForItem(m.itemId).map(t => `<option value="${t.id}">${esc(t.title)}</option>`).join("")}</select></label>
+            <label>Paid each (optional)<input name="paid" placeholder="for P/L" style="width:8em"></label>
             <button class="primary">Log sale</button><button type="button" data-act="cancel-holding">Cancel</button>
-            <span class="note">After-tax gold goes to Portfolio → Cash.</span></form></td></tr>` : ""}`;
+            <span class="note">After-tax gold goes to Portfolio → Cash. The Journal grades the sale by what the item does next.</span></form></td></tr>` : ""}`;
       }).join("") || `<tr><td colspan="8" class="muted">No items yet. Add some below.</td></tr>`}</tbody></table></div>
     <form data-form="add-member" data-b="${b.id}" class="row" style="margin-top:10px">
       <label>Add item<input name="name" list="item-names" required placeholder="Start typing an item name"></label>
@@ -547,6 +550,12 @@ function basketView(id) {
     </section>`;
 }
 
+/** Open theses on any basket that contains this item — the ones a sale of it could belong to. */
+function thesesForItem(itemId) {
+  const baskets = new Set(state.baskets.filter(b => b.members.some(m => m.itemId === itemId)).map(b => b.id));
+  return state.theses.filter(t => t.status !== "closed" && baskets.has(t.basketId));
+}
+
 function trendFig(b) {
   if (!indexMembers(b).length) return "—";
   const t = basketTrend(b);
@@ -561,11 +570,15 @@ function basketChart(b) {
     loadBasketHistory(b); return `<p class="note">Loading history for ${indexMembers(b).length} items…</p>`;
   }
   if (s.length < 2) return `<p class="note">Not enough history to draw the index.</p>`;
-  const hlines = state.theses.filter(t => t.basketId === b.id && t.status !== "closed").flatMap(t => [
-    t.entryIndex != null && { v: t.entryIndex, label: `Entry ${t.entryIndex}`, cls: "hl-entry" },
-    t.targetIndex != null && { v: t.targetIndex, label: `Target ${t.targetIndex}`, cls: "hl-target" },
-    t.invalidationIndex != null && { v: t.invalidationIndex, label: `Invalidation ${t.invalidationIndex}`, cls: "hl-invalid" },
-  ].filter(Boolean));
+  // one line per thesis level, coloured by the signal it raises (green buy, gold sell, red wrong, blue watch)
+  const cls = { buy_zone: "hl-entry", sell_zone: "hl-target", invalidated: "hl-invalid", watch: "hl-watch" };
+  const hlines = state.theses.filter(t => t.basketId === b.id && t.status !== "closed").flatMap(t => {
+    const d = R.THESIS_DIRECTIONS[R.directionOf(t)];
+    return R.rulesFromThesis(t).map(r => {
+      const k = r.id.split(":").pop();
+      return { v: r.conditions[0].value, label: `${d[k].short} ${r.conditions[0].value}`, cls: cls[r.signal] };
+    });
+  });
   return svgChart(s.map(x => ({ t: x.t, p: x.index })), {
     baseline: 100, events: state.events, hlines, fmt: v => v.toFixed(0), label: `${b.name} index`,
   });
@@ -575,10 +588,17 @@ function thesisCard(t) {
   const ev = state.events.find(e => e.id === t.eventId);
   const trades = state.trades.filter(x => x.thesisId === t.id);
   const st = C.tradeStats(trades);
+  const dec = C.sellDecisionStats(trades.filter(x => x.kind === "holding_sale"), id => nowSell(id));
+  const d = R.THESIS_DIRECTIONS[R.directionOf(t)];
+  if (ui.editingThesis === t.id) return `<div class="panel">${thesisForm(state.baskets.find(b => b.id === t.basketId), t)}</div>`;
   return `<div class="panel stack">
     <div class="row" style="justify-content:space-between"><strong>${esc(t.title)}</strong>
-      <span class="row"><span class="chip">${esc(S.DIP_TYPES[t.dipType]?.split(" — ")[0] || t.dipType)}</span><span class="chip ${t.status === "closed" ? "muted" : "sig-watch"}">${t.status === "closed" ? "Closed" : "Open"}</span></span></div>
-    <div class="figures">${fig("Entry ≤", t.entryIndex ?? "—")}${fig("Target ≥", t.targetIndex ?? "—")}${fig("Invalidation ≤", t.invalidationIndex ?? "—")}${fig("Review by", t.reviewDate || "—")}${fig("Trades", st.n)}${fig("Realized P/L", st.n ? gp(st.pnl) : "—", "", tone(st.pnl))}</div>
+      <span class="row"><span class="chip">${esc(S.DIP_TYPES[t.dipType]?.split(" — ")[0] || t.dipType)}</span><span class="chip">${esc(d.label)}</span>
+      <span class="chip ${t.status === "closed" ? "muted" : "sig-watch"}">${t.status === "closed" ? "Closed" : "Open"}</span>
+      ${t.status !== "closed" ? `<button data-act="edit-thesis" data-id="${t.id}">Edit</button>` : ""}</span></div>
+    <div class="figures">${fig(d.entry.short, t.entryIndex ?? "—")}${fig(d.target.short, t.targetIndex ?? "—")}${fig(d.invalid.short, t.invalidationIndex ?? "—")}${fig("Review by", t.reviewDate || "—")}
+      ${fig("Trades", st.n)}${fig("Realized P/L", st.n ? gp(st.pnl) : "—", "", tone(st.pnl))}
+      ${dec.n ? fig("Sales vs holding", gp(dec.edge), "After-tax gold from selling minus what you'd get selling the same items now", tone(dec.edge)) : ""}</div>
     ${ev ? `<p class="note">Event: ${esc(ev.name)} (${esc(ev.date)})</p>` : ""}
     ${t.expectation ? `<p><span class="label">Expect</span><br>${esc(t.expectation)}</p>` : ""}
     ${t.reasoning ? `<p><span class="label">Why</span><br>${esc(t.reasoning)}</p>` : ""}
@@ -591,23 +611,31 @@ function thesisCard(t) {
   </div>`;
 }
 
-function thesisForm(b) {
-  return `<form data-form="new-thesis" data-b="${b.id}" class="stack" style="margin-top:10px">
+/** New-thesis form, or edit form when `t` is given. Level labels follow the chosen direction. */
+function thesisForm(b, t = null) {
+  const dir = t ? R.directionOf(t) : "recover";
+  const d = R.THESIS_DIRECTIONS[dir];
+  const v = (k, fallback = "") => esc(t?.[k] ?? fallback);
+  return `<form data-form="${t ? "edit-thesis" : "new-thesis"}" ${t ? `data-id="${t.id}"` : `data-b="${b.id}"`} class="stack" style="margin-top:10px">
     <div class="row">
-      <label style="flex:1">Title<input name="title" required placeholder="e.g. Melee gear dumped to fund raid entry"></label>
-      <label>Dip type<select name="dipType">${Object.entries(S.DIP_TYPES).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></label>
-      <label>Event<select name="eventId"><option value="">None</option>${state.events.map(e => `<option value="${e.id}" ${e.id === state.settings.activeEventId ? "selected" : ""}>${esc(e.name)}</option>`).join("")}</select></label>
+      <label style="flex:1">Title<input name="title" required value="${v("title")}" placeholder="e.g. Melee gear dumped to fund raid entry"></label>
+      <label>Dip type<select name="dipType" data-thesis-diptype>${Object.entries(S.DIP_TYPES).map(([k, lbl]) => `<option value="${k}" ${t?.dipType === k ? "selected" : ""}>${esc(lbl)}</option>`).join("")}</select></label>
+      <label>Direction<select name="direction" data-thesis-direction>${Object.entries(R.THESIS_DIRECTIONS).map(([k, x]) => `<option value="${k}" ${dir === k ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select></label>
+      <label>Event<select name="eventId"><option value="">None</option>${state.events.map(e => `<option value="${e.id}" ${(t ? t.eventId : state.settings.activeEventId) === e.id ? "selected" : ""}>${esc(e.name)}</option>`).join("")}</select></label>
     </div>
-    <label>What you expect<textarea name="expectation" placeholder="e.g. Index back to 95+ within 4–6 weeks once the raid rush settles"></textarea></label>
-    <label>Why<textarea name="reasoning" placeholder="What you know about the update and these items"></textarea></label>
+    <label>What you expect<textarea name="expectation" placeholder="e.g. Index back to 95+ within 4–6 weeks once the raid rush settles">${v("expectation")}</textarea></label>
+    <label>Why<textarea name="reasoning" placeholder="What you know about the update and these items">${v("reasoning")}</textarea></label>
     <div class="row">
-      <label>Entry: index ≤<input name="entryIndex" type="number" step="0.5" style="width:6em" placeholder="75"></label>
-      <label>Target: index ≥<input name="targetIndex" type="number" step="0.5" style="width:6em" placeholder="95"></label>
-      <label>Invalidation: index ≤<input name="invalidationIndex" type="number" step="0.5" style="width:6em" placeholder="60"></label>
-      <label>Review by<input name="reviewDate" type="date"></label>
-      <button class="primary">Save thesis</button>
+      <label><span data-lvl="entry">${d.entry.short}</span><input name="entryIndex" type="number" step="0.5" style="width:6em" value="${v("entryIndex")}"></label>
+      <label><span data-lvl="target">${d.target.short}</span><input name="targetIndex" type="number" step="0.5" style="width:6em" value="${v("targetIndex")}"></label>
+      <label><span data-lvl="invalid">${d.invalid.short}</span><input name="invalidationIndex" type="number" step="0.5" style="width:6em" value="${v("invalidationIndex")}"></label>
+      <label>Review by<input name="reviewDate" type="date" value="${v("reviewDate")}"></label>
+      <button class="primary">${t ? "Save changes" : "Save thesis"}</button>
+      ${t ? `<button type="button" data-act="edit-thesis" data-id="">Cancel</button>` : ""}
     </div>
-    <p class="note">Levels are basket index values: 100 = baseline, 75 = 25% below it. Each level becomes a rule automatically.</p>
+    <p class="note">Levels are basket index values: 100 = baseline, 75 = 25% below it. Any level can be left blank.
+      <br><strong>Expect recovery:</strong> buy at or below entry, take profit at or above target, wrong if it falls to invalidation.
+      <br><strong>Expect no recovery:</strong> sell if it bounces up to entry, played out at or below target, wrong if it climbs back to invalidation.</p>
   </form>`;
 }
 
@@ -675,7 +703,7 @@ function portfolio() {
     cost += p.qty * p.avgCost; if (r) net += r.net;
     return { p, sell, r, thesis: state.theses.find(t => t.id === p.thesisId) };
   });
-  const realized = state.trades.reduce((a, t) => a + t.pnl, 0);
+  const realized = state.trades.reduce((a, t) => a + (t.pnl ?? 0), 0);
   const cash = cashNow();
   const holdNet = live ? holdingsNet() : null;
   return `
@@ -752,32 +780,61 @@ function cashPanel() {
 
 // ================================================================ JOURNAL
 function journal() {
-  const trades = [...state.trades].sort((a, b) => b.closedAt.localeCompare(a.closedAt));
-  const all = C.tradeStats(trades);
-  const byDip = C.tradeStats(trades, t => t.dipType);
-  const byCause = C.tradeStats(trades.filter(t => t.review?.cause), t => t.review.cause);
+  const byDate = (a, b) => b.closedAt.localeCompare(a.closedAt) || (b.at || "").localeCompare(a.at || "");
+  const trades = state.trades.filter(t => t.kind !== "holding_sale").sort(byDate);
+  const sales = state.trades.filter(t => t.kind === "holding_sale").sort(byDate);
+  const all = C.tradeStats(state.trades);
+  const byDip = C.tradeStats(state.trades, t => t.dipType);
+  const byCause = C.tradeStats(state.trades.filter(t => t.review?.cause), t => t.review.cause);
+  const live = !!market.loadedAt;
+  const dec = live ? C.sellDecisionStats(sales, id => nowSell(id)) : { n: 0 };
   const statRows = (obj, labels) => Object.entries(obj).map(([k, s]) => `<tr><td>${esc(labels[k]?.split(" — ")[0] || k)}</td><td class="num">${s.n}</td><td class="num">${s.winRate?.toFixed(0) ?? "—"}%</td><td class="num ${tone(s.pnl)}">${gp(s.pnl)}</td><td class="num ${tone(s.roi)}">${pct(s.roi)}</td><td class="num">${s.avgHoldDays?.toFixed(1) ?? "—"}</td></tr>`).join("");
   const statTable = (title, obj, labels) => `<div class="stack"><h3>${title}</h3><div class="table-wrap"><table><thead><tr><th></th><th class="num">Trades</th><th class="num">Win rate</th><th class="num">P/L</th><th class="num">ROI</th><th class="num">Avg days</th></tr></thead><tbody>${statRows(obj, labels) || `<tr><td colspan="6" class="muted">No data yet.</td></tr>`}</tbody></table></div></div>`;
-  const pending = trades.filter(t => !t.review?.cause).length;
+  const pending = state.trades.filter(t => !t.review?.cause).length;
+  const thesisLine = t => (t.thesisId ? "Thesis: " + esc(state.theses.find(x => x.id === t.thesisId)?.title || "deleted") : "No thesis.");
+
+  const reviewForm = t => `<form data-form="review" data-id="${t.id}" class="stack">
+      <div class="grid-2"><label>What you expected<textarea name="expected">${esc(t.review?.expected)}</textarea></label>
+      <label>What actually happened<textarea name="actual">${esc(t.review?.actual)}</textarea></label>
+      <label>What went right<textarea name="right">${esc(t.review?.right)}</textarea></label>
+      <label>What went wrong<textarea name="wrong">${esc(t.review?.wrong)}</textarea></label></div>
+      <div class="row"><label>Main cause<select name="cause"><option value="">Choose…</option>${Object.entries(S.MISTAKE_CAUSES).map(([k, v]) => `<option value="${k}" ${t.review?.cause === k ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></label>
+      <button class="primary">Save review</button></div>
+    </form>`;
+  const needs = t => (!t.review?.cause ? '<span class="chip sig-watch">Needs review</span>' : "");
+
+  const tradeItem = t => `<details class="panel" ${!t.review?.cause ? "open" : ""}>
+      <summary>${esc(t.closedAt)} · ${esc(t.name)} × ${t.qty.toLocaleString()} · <span class="${tone(t.pnl)}">${gp(t.pnl)} (${pct(t.roi)})</span> · ${t.holdDays} days ${needs(t)}</summary>
+      <p class="note">Bought at ${gp(t.buyAvg)}, sold at ${gp(t.sellPrice)}, tax ${gp(t.tax)}. ${thesisLine(t)}</p>
+      ${reviewForm(t)}</details>`;
+
+  const saleItem = t => {
+    const d = live ? C.sellDecision(t, nowSell(t.itemId)) : null;
+    const verdict = !d ? "" : d.edge > 0
+      ? `<span class="up">selling saved ${gp(d.edge)} so far</span>`
+      : `<span class="down">holding would be ${gp(-d.edge)} better</span>`;
+    return `<details class="panel" ${!t.review?.cause ? "open" : ""}>
+      <summary>${esc(t.closedAt)} · Sold ${esc(t.name)} × ${t.qty.toLocaleString()} at ${gp(t.sellPrice)} · ${verdict} ${needs(t)}</summary>
+      <p class="note">Got ${gp(t.net)} after ${gp(t.tax)} tax. ${d ? `Instant-sell price now ${gp(nowSell(t.itemId))} (${pct(d.priceMove)} since the sale), worth ${gp(d.holdValueNow)} after tax if you still held it.` : ""}
+        ${t.pnl != null ? `Against what you paid: <span class="${tone(t.pnl)}">${gp(t.pnl)} (${pct(t.roi)})</span>.` : ""} ${thesisLine(t)}</p>
+      ${reviewForm(t)}</details>`;
+  };
+
   return `
-    <div class="view-head"><div><h2>Journal</h2><p>Every sell, what you expected, what happened, and why. This is where the app learns from you.</p></div></div>
+    <div class="view-head"><div><h2>Journal</h2><p>Every sell, what you expected, what happened, and why. Trades are graded by profit; holdings you sold are graded by what the item did after you sold.</p></div></div>
     <div class="panel figures">
-      ${fig("Closed trades", all.n)}${fig("Win rate", all.n ? all.winRate.toFixed(0) + "%" : "—")}${fig("Total P/L", all.n ? gp(all.pnl) : "—", "", tone(all.pnl))}
-      ${fig("ROI", pct(all.roi))}${fig("Avg hold", all.n ? all.avgHoldDays.toFixed(1) + " days" : "—")}${fig("Need review", pending)}
+      ${fig("Closed trades", all.n)}${fig("Win rate", all.n ? all.winRate.toFixed(0) + "%" : "—")}${fig("Trade P/L", all.n ? gp(all.pnl) : "—", "", tone(all.pnl))}
+      ${fig("Avg hold", all.n ? all.avgHoldDays.toFixed(1) + " days" : "—")}
+      ${fig("Holdings sold", sales.length)}${fig("Sales right so far", dec.n ? `${dec.right} / ${dec.n}` : "—")}
+      ${fig("Saved vs holding", dec.n ? gp(dec.edge) : "—", "After-tax gold from your sales minus what the same items would bring now", tone(dec.edge))}
+      ${fig("Need review", pending)}
     </div>
-    <div class="grid-2" style="margin-top:16px">${statTable("By dip type", byDip, S.DIP_TYPES)}${statTable("By main cause", byCause, S.MISTAKE_CAUSES)}</div>
+    <div class="grid-2" style="margin-top:16px">${statTable("Trades by dip type", byDip, S.DIP_TYPES)}${statTable("Trades by main cause", byCause, S.MISTAKE_CAUSES)}</div>
+    <section class="stack" style="margin-top:24px"><h3>Holdings you sold</h3>
+      ${sales.map(saleItem).join("") || `<p class="note">None yet. Sell from a Holdings basket and the decision shows up here.</p>`}
+    </section>
     <section class="stack" style="margin-top:24px"><h3>Trades</h3>
-      ${trades.map(t => `<details class="panel" ${!t.review?.cause ? "open" : ""}>
-        <summary>${esc(t.closedAt)} · ${esc(t.name)} × ${t.qty.toLocaleString()} · <span class="${tone(t.pnl)}">${gp(t.pnl)} (${pct(t.roi)})</span> · ${t.holdDays} days ${!t.review?.cause ? '<span class="chip sig-watch">Needs review</span>' : ""}</summary>
-        <p class="note">Bought at ${gp(t.buyAvg)}, sold at ${gp(t.sellPrice)}, tax ${gp(t.tax)}. ${t.thesisId ? "Thesis: " + esc(state.theses.find(x => x.id === t.thesisId)?.title || "deleted") : "No thesis."}</p>
-        <form data-form="review" data-id="${t.id}" class="stack">
-          <div class="grid-2"><label>What you expected<textarea name="expected">${esc(t.review?.expected)}</textarea></label>
-          <label>What actually happened<textarea name="actual">${esc(t.review?.actual)}</textarea></label>
-          <label>What went right<textarea name="right">${esc(t.review?.right)}</textarea></label>
-          <label>What went wrong<textarea name="wrong">${esc(t.review?.wrong)}</textarea></label></div>
-          <div class="row"><label>Main cause<select name="cause"><option value="">Choose…</option>${Object.entries(S.MISTAKE_CAUSES).map(([k, v]) => `<option value="${k}" ${t.review?.cause === k ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></label>
-          <button class="primary">Save review</button></div>
-        </form></details>`).join("") || `<p class="note">No closed trades yet. Sells you log in Portfolio show up here for review.</p>`}
+      ${trades.map(tradeItem).join("") || `<p class="note">No closed trades yet. Sells you log in Portfolio show up here for review.</p>`}
     </section>`;
 }
 
@@ -868,6 +925,7 @@ const actions = {
     persist(); location.hash = "#baskets";
   },
   "edit-basket"() { ui.editingBasket = !ui.editingBasket; render(); },
+  "edit-thesis"(el) { ui.editingThesis = el.dataset.id || null; render(); },
   "rm-cash"(el) { state.cash.entries = state.cash.entries.filter(c => c.id !== el.dataset.id); persist(); render(); },
   "sell-holding"(el) { ui.sellingHolding = `${el.dataset.b}:${el.dataset.i}`; render(); },
   "cancel-holding"() { ui.sellingHolding = null; render(); },
@@ -914,7 +972,7 @@ const forms = {
     const r = C.closeTrade(p, qty, price);
     const thesis = state.theses.find(t => t.id === p.thesisId);
     state.trades.push({
-      id: S.uid("t_"), positionId: p.id, itemId: p.itemId, name: p.name, ...r,
+      id: S.uid("t_"), kind: "trade", positionId: p.id, itemId: p.itemId, name: p.name, ...r,
       openedAt: p.openedAt, closedAt: d.date || today(), at: new Date().toISOString(), holdDays: C.daysBetween(p.openedAt, d.date || today()),
       thesisId: p.thesisId, dipType: thesis?.dipType || "unset", review: {},
     });
@@ -954,12 +1012,22 @@ const forms = {
   },
   "new-thesis"(f, d) {
     state.theses.push({
-      id: S.uid("th_"), basketId: f.dataset.b, eventId: d.eventId || null, title: d.title.trim(), dipType: d.dipType,
+      id: S.uid("th_"), basketId: f.dataset.b, eventId: d.eventId || null, title: d.title.trim(), dipType: d.dipType, direction: d.direction,
       expectation: d.expectation, reasoning: d.reasoning,
       entryIndex: num(d.entryIndex), targetIndex: num(d.targetIndex), invalidationIndex: num(d.invalidationIndex),
       reviewDate: d.reviewDate || null, status: "open", createdAt: today(), closedAt: null, verdict: null,
     });
     persist(); render();
+  },
+  "edit-thesis"(f, d) {
+    const t = state.theses.find(x => x.id === f.dataset.id);
+    Object.assign(t, {
+      title: d.title.trim() || t.title, dipType: d.dipType, direction: d.direction, eventId: d.eventId || null,
+      expectation: d.expectation, reasoning: d.reasoning,
+      entryIndex: num(d.entryIndex), targetIndex: num(d.targetIndex), invalidationIndex: num(d.invalidationIndex),
+      reviewDate: d.reviewDate || null,
+    });
+    ui.editingThesis = null; persist(); setStatus(`Saved “${t.title}”.`); render();
   },
   "close-thesis"(f, d) {
     const t = state.theses.find(x => x.id === f.dataset.id);
@@ -1007,14 +1075,21 @@ const forms = {
   },
   "sell-holding"(f, d) {
     const b = state.baskets.find(x => x.id === f.dataset.b), m = b.members[Number(f.dataset.i)];
-    const qty = Math.min(num(d.qty), m.qty || 0), price = num(d.price);
+    const qty = Math.min(num(d.qty), m.qty || 0), price = num(d.price), paid = num(d.paid);
     if (!(qty > 0) || !(price > 0)) return setStatus("Enter a quantity and price.", true);
     const net = C.netProceeds(price, qty, m.itemId);
-    state.cash.entries.push({ id: S.uid("c_"), date: d.date || today(), at: new Date().toISOString(), type: "holding_sale", amount: net,
-      note: `${qty} × ${m.name} at ${gp(price)} (tax ${gp(qty * C.geTax(price, m.itemId))})`, ref: { basketId: b.id, itemId: m.itemId } });
+    const thesis = state.theses.find(t => t.id === d.thesis);
+    const cost = paid > 0 ? qty * paid : null;
+    state.trades.push({
+      id: S.uid("t_"), kind: "holding_sale", itemId: m.itemId, name: m.name, qty, sellPrice: price,
+      tax: qty * C.geTax(price, m.itemId), net, cost, pnl: cost != null ? net - cost : null,
+      roi: cost ? ((net - cost) / cost) * 100 : null, buyAvg: paid > 0 ? paid : null,
+      openedAt: null, closedAt: d.date || today(), at: new Date().toISOString(), holdDays: null,
+      thesisId: thesis?.id || null, dipType: thesis?.dipType || "unset", basketId: b.id, review: {},
+    });
     m.qty = (m.qty || 0) - qty;
     ui.sellingHolding = null; persist();
-    setStatus(`Sold ${qty} × ${m.name}: +${gp(net)} after tax. Cash now ${gp(cashNow())}.`); render();
+    setStatus(`Sold ${qty} × ${m.name}: +${gp(net)} after tax. Cash now ${gp(cashNow())}. Review the decision in the Journal.`); render();
   },
   settings(f, d) {
     const days = Math.max(0, Math.min(30, Number(d.days) || 0));
@@ -1044,6 +1119,13 @@ view.addEventListener("change", e => {
     ui.direction = t.value;
     if (ui.sort === "pct") ui.dir = t.value === "up" ? -1 : 1; // biggest risers / biggest dips first
     render();
+  }
+  else if (t.dataset.thesisDirection != null || t.dataset.thesisDiptype != null) {
+    const form = t.closest("form");
+    const dirSel = form.querySelector("[data-thesis-direction]");
+    if (t.dataset.thesisDiptype != null && form.dataset.form === "new-thesis") dirSel.value = t.value === "structural" ? "decline" : "recover";
+    const d = R.THESIS_DIRECTIONS[dirSel.value];
+    for (const k of ["entry", "target", "invalid"]) form.querySelector(`[data-lvl="${k}"]`).textContent = d[k].short;
   }
   else if (t.dataset.sel != null) { const id = Number(t.dataset.sel); t.checked ? ui.selected.add(id) : ui.selected.delete(id); render(); }
   else if (t.id === "sel-all") { (ui.visibleIds || []).forEach(id => t.checked ? ui.selected.add(id) : ui.selected.delete(id)); render(); }

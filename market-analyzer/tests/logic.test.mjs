@@ -132,6 +132,19 @@ test("thesis levels become rules; priority picks the strongest signal", () => {
   assert.equal(R.evaluateAll(rules, at(85)).signalFor("basket", "b1"), "hold");
 });
 
+test("decline theses flip their levels", () => {
+  const thesis = { id: "d1", basketId: "b2", title: "Displaced", direction: "decline", entryIndex: 90, targetIndex: 75, invalidationIndex: 95 };
+  const rules = R.rulesFromThesis(thesis);
+  assert.deepEqual(rules.map(r => [r.signal, r.conditions[0].op]), [["sell_zone", ">="], ["watch", "<="], ["invalidated", ">="]]);
+  const at = index => ({ metric: () => index });
+  assert.equal(R.evaluateAll(rules, at(85)).signalFor("basket", "b2"), "hold");
+  assert.equal(R.evaluateAll(rules, at(92)).signalFor("basket", "b2"), "sell_zone");   // bounce: sell into it
+  assert.equal(R.evaluateAll(rules, at(97)).signalFor("basket", "b2"), "invalidated"); // recovered: wrong
+  assert.equal(R.evaluateAll(rules, at(70)).signalFor("basket", "b2"), "watch");       // played out
+  // old theses without a direction keep behaving as "recover"
+  assert.equal(R.rulesFromThesis({ ...thesis, direction: undefined })[0].signal, "buy_zone");
+});
+
 test("a condition with missing data never fires", () => {
   const rule = { id: "r", target: { kind: "item", id: 1 }, signal: "watch", conditions: [{ metric: "trend", op: ">=", value: -0.5 }] };
   const r = R.evaluateRule(rule, { metric: () => null });
@@ -159,4 +172,24 @@ test("hourly samples average into a baseline", () => {
   const out = averageSamples([s1, s2]);
   assert.equal(out.get(1).price, 110);
   assert.equal(out.get(1).hourlyVolume, 10);
+});
+
+test("holding sales: graded against holding, kept out of P/L stats without a cost basis, counted in cash", () => {
+  const sale = { kind: "holding_sale", itemId: 12817, name: "Elysian spirit shield", qty: 1, sellPrice: 400_000_000, net: 395_000_000, cost: null, pnl: null, closedAt: "2026-10-22" };
+  const fellMore = C.sellDecision(sale, 360_000_000);
+  assert.equal(fellMore.holdValueNow, 355_000_000);
+  assert.equal(fellMore.edge, 40_000_000);           // selling saved 40m so far
+  assert.equal(fellMore.priceMove, -10);
+  assert.ok(C.sellDecision(sale, 450_000_000).edge < 0); // it recovered: selling cost gold
+  assert.equal(C.sellDecision(sale, null), null);
+
+  const stats = C.sellDecisionStats([sale, { ...sale, itemId: 2, sellPrice: 10_000_000, net: 9_800_000 }], id => (id === 12817 ? 360_000_000 : 11_000_000));
+  assert.equal(stats.n, 2); assert.equal(stats.right, 1);
+
+  const trade = { pnl: 10, cost: 100, holdDays: 2 };
+  assert.equal(C.tradeStats([trade, sale]).n, 1);    // the sale without a basis is left out
+
+  const { rows } = C.cashLedger({ entries: [], positions: [], trades: [sale] });
+  assert.equal(rows[0].kind, "holding_sale");
+  assert.equal(rows[0].amount, 395_000_000);
 });

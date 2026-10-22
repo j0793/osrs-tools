@@ -41,22 +41,42 @@ const OPS = {
 };
 export const OP_LIST = Object.keys(OPS);
 
-/** Rules generated from a thesis's levels. Levels are basket index values (100 = baseline). */
+/**
+ * What a thesis's three levels mean, by direction. Levels are basket index values (100 = baseline).
+ *   recover — you expect the basket to climb back:
+ *     entry ≤ → Buy zone · target ≥ → Sell zone (take profit) · invalidation ≤ → Invalidated
+ *   decline — you expect it NOT to recover (structural / displaced):
+ *     entry ≥ → Sell zone (sell into a bounce) · target ≤ → Watch (decline played out, reassess)
+ *     · invalidation ≥ → Invalidated (it recovered after all)
+ */
+export const THESIS_DIRECTIONS = {
+  recover: {
+    label: "Expect recovery",
+    entry:   { op: "<=", signal: "buy_zone",    name: "in entry zone",          short: "Buy at ≤" },
+    target:  { op: ">=", signal: "sell_zone",   name: "target reached",         short: "Take profit at ≥" },
+    invalid: { op: "<=", signal: "invalidated", name: "invalidation hit",       short: "Wrong if ≤" },
+  },
+  decline: {
+    label: "Expect no recovery",
+    entry:   { op: ">=", signal: "sell_zone",   name: "bounced into sell zone", short: "Sell if it bounces to ≥" },
+    target:  { op: "<=", signal: "watch",       name: "decline played out",     short: "Played out at ≤" },
+    invalid: { op: ">=", signal: "invalidated", name: "recovered — thesis wrong", short: "Wrong if ≥" },
+  },
+};
+
+export const directionOf = thesis => (thesis.direction === "decline" ? "decline" : "recover");
+
+/** Rules generated from a thesis's levels, following its direction. */
 export function rulesFromThesis(thesis) {
   if (!thesis.basketId) return [];
-  const t = { kind: "basket", id: thesis.basketId };
-  const base = { thesisId: thesis.id, target: t, auto: true };
-  const out = [];
-  if (thesis.entryIndex != null)
-    out.push({ ...base, id: `${thesis.id}:entry`, name: `${thesis.title}: in entry zone`, signal: "buy_zone",
-      conditions: [{ metric: "index", op: "<=", value: thesis.entryIndex }] });
-  if (thesis.targetIndex != null)
-    out.push({ ...base, id: `${thesis.id}:target`, name: `${thesis.title}: target reached`, signal: "sell_zone",
-      conditions: [{ metric: "index", op: ">=", value: thesis.targetIndex }] });
-  if (thesis.invalidationIndex != null)
-    out.push({ ...base, id: `${thesis.id}:invalid`, name: `${thesis.title}: invalidation hit`, signal: "invalidated",
-      conditions: [{ metric: "index", op: "<=", value: thesis.invalidationIndex }] });
-  return out;
+  const d = THESIS_DIRECTIONS[directionOf(thesis)];
+  const base = { thesisId: thesis.id, target: { kind: "basket", id: thesis.basketId }, auto: true };
+  return [["entry", thesis.entryIndex], ["target", thesis.targetIndex], ["invalid", thesis.invalidationIndex]]
+    .filter(([, v]) => v != null)
+    .map(([k, v]) => ({
+      ...base, id: `${thesis.id}:${k}`, name: `${thesis.title}: ${d[k].name}`, signal: d[k].signal,
+      conditions: [{ metric: "index", op: d[k].op, value: v }],
+    }));
 }
 
 /**

@@ -100,3 +100,4 @@ pre.mono { white-space: pre-wrap; font-size: var(--step--1); background: var(--s
 .selbar { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 96px); z-index: 4; align-items: center; }
 td input[type="checkbox"], th input[type="checkbox"] { width: auto; }
 .chart text.hline-label { stroke: none; }
+.chart .hl-watch { stroke: var(--info); fill: var(--info); }

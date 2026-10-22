@@ -1,5 +1,32 @@
 # GE Market Analyzer — changelog
 
+## 0.5.0 — 2026-10-22
+
+Theses can bet on "no recovery", and selling a holding is now a graded decision.
+
+### Added
+- **Thesis direction**: *Expect recovery* or *Expect no recovery*. For no recovery, the levels flip:
+  - Sell if it bounces to ≥ entry → Sell zone
+  - Played out at ≤ target → Watch
+  - Wrong if ≥ invalidation → Invalidated
+  Choosing the Structural dip type sets "Expect no recovery" automatically. Labels, rule names and chart lines follow the direction.
+- **Edit theses**: title, dip type, direction, event, text, levels and review date.
+- **Holding sales in the Journal**: the Sell form on a Holdings basket takes a thesis and, optionally, what you paid. Each sale is graded by what the item did after: "selling saved X so far" or "holding would be X better", using today's instant-sell price after tax. Reviewable like trades.
+- Journal figures: Holdings sold, Sales right so far, Saved vs holding. Thesis cards show Sales vs holding.
+- Chart lines are coloured by the signal they raise (green buy, gold sell, red wrong, blue watch).
+- Tests for decline theses and sell-decision grading.
+
+### Fixed
+- Amounts just under a unit showed as "1000.0k" or "1000m"; they now read 1.0m and 1.00b.
+
+### Changed
+- Holding sales are stored as trades (kind "holding_sale") instead of cash entries. Cash totals are unchanged.
+- Trade stats only count sells with a known cost; a holding sold without "paid each" is graded by the sell decision instead.
+
+### Migration
+- Schema 2 → 3 on first load: holding sales logged in v0.4 become journal entries. Their price per item is worked back from the after-tax amount and can be 1 gp off.
+- Existing theses keep working as "Expect recovery".
+
 ## 0.4.0 — 2026-10-22
 
 Baskets get history, a trend, and are easier to build and manage.

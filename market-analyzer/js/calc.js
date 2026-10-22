@@ -218,7 +218,7 @@ export function cashLedger({ entries = [], positions = [], trades = [] }) {
     ...positions.flatMap(p => (p.fills || []).map((f, i) => ({
       date: f.date, at: f.at || "", kind: "buy", amount: -f.qty * f.price, note: `${f.qty.toLocaleString()} × ${p.name}`, order: 1, i,
     }))),
-    ...trades.map((t, i) => ({ date: t.closedAt, at: t.at || "", kind: "sell", amount: t.net, note: `${t.qty.toLocaleString()} × ${t.name}`, order: 2, i })),
+    ...trades.map((t, i) => ({ date: t.closedAt, at: t.at || "", kind: t.kind === "holding_sale" ? "holding_sale" : "sell", amount: t.net, note: `${t.qty.toLocaleString()} × ${t.name}`, order: 2, i })),
   ];
   // Same day: by the time each was logged (`at`). Rows without a time (opening balances,
   // data from v0.1) go first, then manual → buys → sells.
@@ -228,13 +228,42 @@ export function cashLedger({ entries = [], positions = [], trades = [] }) {
   return { rows, balance };
 }
 
+// ---------- Sell decisions ----------
+/**
+ * Was selling a holding right, so far? Compares the after-tax gold you got with
+ * what the same items would bring after tax at today's instant-sell price.
+ * edge > 0: selling beat holding.
+ */
+export function sellDecision(trade, nowSellPrice) {
+  if (!(nowSellPrice > 0)) return null;
+  const holdValueNow = netProceeds(nowSellPrice, trade.qty, trade.itemId);
+  const priceMove = pctChange(nowSellPrice, trade.sellPrice);
+  return { holdValueNow, edge: trade.net - holdValueNow, priceMove };
+}
+
+/** Sum of sell decisions: how many, how many were right so far, total gold saved (or lost) vs holding. */
+export function sellDecisionStats(trades, nowSellById) {
+  let n = 0, right = 0, edge = 0;
+  for (const t of trades) {
+    const d = sellDecision(t, nowSellById(t.itemId));
+    if (!d) continue;
+    n++; edge += d.edge; if (d.edge > 0) right++;
+  }
+  return { n, right, edge };
+}
+
 // ---------- Journal stats ----------
 export function daysBetween(a, b) {
   return Math.max(0, Math.round((new Date(b) - new Date(a)) / 86400000));
 }
 
-/** Track record from closed trades, overall and grouped by a key (e.g. dip type). */
+/**
+ * Track record from closed trades, overall and grouped by a key (e.g. dip type).
+ * Only trades with a known P/L count: a holding sold without a cost basis has none,
+ * and is graded by sellDecision() instead.
+ */
 export function tradeStats(trades, groupBy = null) {
+  trades = trades.filter(t => t.pnl != null && t.cost != null);
   const summarize = list => {
     const n = list.length;
     if (!n) return { n: 0 };

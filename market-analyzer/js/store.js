@@ -2,11 +2,15 @@
 // Nothing is sent anywhere. Use Export / Import (Settings) to back up or
 // move your data to another device.
 //
-// Schema v2 — bump SCHEMA_VERSION and add a step to migrate() when it changes.
+// Schema v3 — bump SCHEMA_VERSION and add a step to migrate() when it changes.
 // v1 → v2: the fixed `settings.capital` number became a cash ledger (`cash.entries`).
+// v2 → v3: holding sales moved from cash entries to trades (kind "holding_sale"),
+//          so they can link to a thesis and be graded in the Journal.
+
+import { breakEvenSell, geTax } from "./calc.js";
 
 const KEY = "osrs-market-analyzer";
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /** Cash movement types. Buys and sells are added automatically from your logs. */
 export const CASH_TYPES = {
@@ -65,8 +69,10 @@ export function emptyState() {
                     //   entryIndex, targetIndex, invalidationIndex, reviewDate, status, createdAt, closedAt, verdict }
     rules: [],      // custom rules (thesis rules are generated, not stored) — see rules.js
     positions: [],  // { id, itemId, name, qty, avgCost, fills: [{ date, qty, price }], thesisId, openedAt, notes }
-    trades: [],     // closed sells — { id, positionId, itemId, name, qty, buyAvg, sellPrice, cost, tax, net, pnl, roi,
-                    //   openedAt, closedAt, holdDays, thesisId, dipType, review: { expected, actual, right, wrong, cause } }
+    trades: [],     // closed sells — { id, kind: "trade"|"holding_sale", positionId, itemId, name, qty, buyAvg, sellPrice,
+                    //   cost, tax, net, pnl, roi, openedAt, closedAt, at, holdDays, thesisId, dipType, basketId,
+                    //   review: { expected, actual, right, wrong, cause } }
+                    // A holding sale has no position; cost/pnl/roi are null unless you entered what you paid.
     whatIf: {},     // itemId → your hypothetical price, used where "what-if" is switched on
   };
 }
@@ -84,6 +90,28 @@ function migrate(s) {
     }
     if (s.settings) delete s.settings.capital;
     s.schema = 2;
+  }
+  if (s.schema < 3) {
+    // Old holding sales were cash entries like "2 × Torva full helm at 166m (tax 3.3m)".
+    // The per-item price is recovered from the after-tax amount; it can be off by 1 gp from rounding.
+    s.trades ||= [];
+    const keep = [];
+    for (const e of s.cash?.entries || []) {
+      if (e.type !== "holding_sale") { keep.push(e); continue; }
+      const m = /^([\d,]+) × (.+?) at /.exec(e.note || "");
+      const qty = m ? Number(m[1].replace(/,/g, "")) : 1;
+      const itemId = e.ref?.itemId ?? null;
+      const sellPrice = breakEvenSell(e.amount / qty, itemId);
+      s.trades.push({
+        id: e.id.replace(/^c_/, "t_"), kind: "holding_sale", itemId, name: m ? m[2] : "Holding", qty,
+        sellPrice, tax: qty * geTax(sellPrice, itemId), net: e.amount, cost: null, pnl: null, roi: null, buyAvg: null,
+        openedAt: null, closedAt: e.date, at: e.at || "", holdDays: null, thesisId: null, dipType: "unset",
+        basketId: e.ref?.basketId ?? null, review: {},
+      });
+    }
+    if (s.cash) s.cash.entries = keep;
+    for (const t of s.trades) t.kind ||= "trade";
+    s.schema = 3;
   }
   return s;
 }
