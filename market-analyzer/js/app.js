@@ -22,7 +22,7 @@ const market = {
 };
 const series = new Map(); // `${id}:${lookback}` → points
 const ui = {
-  q: "", sort: "pct", dir: 1, direction: "down", minVol: 0, showAll: false,
+  q: "", sort: "pct", dir: 1, direction: "down", minVol: 0, showAll: false, selected: new Set(),
   lookback: "30d", sellingId: null, resetArmed: false, useWhatIf: false, check: null,
 };
 
@@ -95,6 +95,7 @@ async function loadMarket() {
   } finally {
     market.loading = false;
     render();
+    if (market.loadedAt) preloadTrendBaskets();
   }
 }
 
@@ -121,11 +122,63 @@ function itemByName(name) {
 }
 
 // ---------------------------------------------------------------- rules context
+const basketWeighting = b => b.weighting || (b.kind === "holdings" ? "value" : "equal");
+const indexMembers = b => b.members.filter(m => m.itemId != null && m.qty !== 0);
+
 function basketCalc(b, opts = {}) {
   const priceFn = opts.whatIf ? priceForIndex : nowMid;
   // qty 0 = sold out of (kept for the record), left out of the index; blank qty = unweighted member
-  return C.basketIndex(b.members.filter(m => m.itemId != null && m.qty !== 0), priceFn, basePrice);
+  return C.basketIndex(indexMembers(b), priceFn, basePrice, basketWeighting(b));
 }
+// ---- basket history (index over time), built from each member's 30-day price history
+const BASKET_LOOKBACK = "30d";
+const loadingBaskets = new Set();
+const failedHistory = new Set(); // basket ids whose history failed; retried only on Refresh prices
+
+/** Index series for a basket, or null until every member's history is loaded. */
+function basketSeries(b) {
+  const members = indexMembers(b);
+  if (!members.length || !market.base) return null;
+  const hist = new Map();
+  for (const m of members) {
+    const pts = series.get(`${m.itemId}:${BASKET_LOOKBACK}`);
+    if (!pts) return null;
+    hist.set(m.itemId, pts.map(x => ({ t: x.t, p: x.p })));
+  }
+  return C.basketIndexSeries(members, hist, basePrice, basketWeighting(b));
+}
+
+/** Basket trend: slope of the index over the last 7 days, as % per day. */
+function basketTrend(b) {
+  const s = basketSeries(b);
+  if (!s || s.length < 3) return null;
+  const cutoff = s[s.length - 1].t - 7 * 86400;
+  return C.trendPctPerDay(s.filter(x => x.t >= cutoff).map(x => ({ t: x.t, p: x.index })));
+}
+
+/** Fetch any missing member histories for a basket (one call per item, cached), then re-render. */
+async function loadBasketHistory(b) {
+  if (loadingBaskets.has(b.id) || failedHistory.has(b.id)) return;
+  const missing = indexMembers(b).map(m => m.itemId).filter(id => !series.has(`${id}:${BASKET_LOOKBACK}`));
+  if (!missing.length) return;
+  loadingBaskets.add(b.id);
+  try {
+    await Promise.all(missing.map(async id => series.set(`${id}:${BASKET_LOOKBACK}`, await api.timeseries(id, BASKET_LOOKBACK))));
+  } catch (e) {
+    failedHistory.add(b.id);
+    setStatus(`Couldn't load history for ${b.name}: ${e.message}. Use Refresh prices on the Screener to retry.`, true);
+  } finally {
+    loadingBaskets.delete(b.id);
+    render();
+  }
+}
+
+/** Baskets used by a trend rule need their history for signals anywhere in the app. */
+function preloadTrendBaskets() {
+  const ids = new Set(allRules().filter(r => r.target.kind === "basket" && r.conditions.some(c => c.metric === "trend")).map(r => r.target.id));
+  state.baskets.filter(b => ids.has(b.id)).forEach(loadBasketHistory);
+}
+
 function openPosition(itemId) { return state.positions.find(p => p.itemId === itemId && p.qty > 0); }
 
 const ctx = {
@@ -136,7 +189,8 @@ const ctx = {
       const { index } = basketCalc(b);
       if (m === "index") return index;
       if (m === "pct_vs_base") return index == null ? null : index - 100;
-      return null; // basket trend: not built yet
+      if (m === "trend") return basketTrend(b);
+      return null;
     }
     const id = target.id;
     if (m === "price") return nowMid(id);
@@ -171,7 +225,7 @@ function render() {
   view.innerHTML = (views[name] || screener)(arg);
   if (name === "item") drawChart(Number(arg));
 }
-window.addEventListener("hashchange", () => { ui.sellingId = null; ui.sellingHolding = null; render(); window.scrollTo(0, 0); });
+window.addEventListener("hashchange", () => { ui.sellingId = null; ui.sellingHolding = null; ui.editingBasket = false; render(); window.scrollTo(0, 0); });
 
 function needsPrices() {
   if (market.loading || (!market.loadedAt && !market.error)) return `<div class="empty">Loading prices…</div>`;
@@ -223,6 +277,7 @@ function screener() {
       ].filter(Boolean).join(", ")}. <a href="#" data-act="clear-filters">Show all matches</a></p>` : "";
   const total = rows.length;
   if (!ui.showAll) rows = rows.slice(0, 150);
+  ui.visibleIds = rows.map(r => r.it.id);
 
   const th = (k, label, cls = "") => `<th class="sortable ${cls}" data-act="sort" data-key="${k}">${label}${ui.sort === k ? (ui.dir > 0 ? " ▲" : " ▼") : ""}</th>`;
   return head + `
@@ -240,9 +295,17 @@ function screener() {
       ${hiddenNote}
       <p class="note">Volume × compares the last 4 hours to the baseline day (1.0 = normal). Break-even is the sell price that recovers the current instant-sell price after tax.</p>
     </div>
+    ${ui.selected.size ? `<div class="panel row selbar" style="margin-top:12px">
+      <strong>${ui.selected.size} selected</strong>
+      <label>Add to<select id="sel-basket">${state.baskets.map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join("")}</select></label>
+      <button class="primary" data-act="add-selected" ${state.baskets.length ? "" : "disabled"}>Add selected</button>
+      <button data-act="clear-selected">Clear</button>
+      <span class="note">${[...ui.selected].slice(0, 6).map(id => esc(nameOf(id))).join(", ")}${ui.selected.size > 6 ? "…" : ""}</span>
+    </div>` : ""}
     <div class="table-wrap" style="margin-top:12px"><table>
-      <thead><tr>${th("name", "Item")}${th("price", "Price", "num")}${th("pct", "vs base", "num")}<th class="num">Rise to base</th>${th("vol", "Vol ×", "num")}<th class="num">Limit</th>${th("cap", "Gold / 4h", "num")}<th class="num">Break-even</th><th>Signal</th></tr></thead>
+      <thead><tr><th><input type="checkbox" id="sel-all" aria-label="Select all shown" ${rows.length && rows.every(r => ui.selected.has(r.it.id)) ? "checked" : ""}></th>${th("name", "Item")}${th("price", "Price", "num")}${th("pct", "vs base", "num")}<th class="num">Rise to base</th>${th("vol", "Vol ×", "num")}<th class="num">Limit</th>${th("cap", "Gold / 4h", "num")}<th class="num">Break-even</th><th>Signal</th></tr></thead>
       <tbody>${rows.map(r => `<tr>
+        <td><input type="checkbox" data-sel="${r.it.id}" aria-label="Select ${esc(r.it.name)}" ${ui.selected.has(r.it.id) ? "checked" : ""}></td>
         <td><a href="#item/${r.it.id}">${esc(r.it.name)}</a></td>
         <td class="num" title="${exact(r.now)}">${gp(r.now)}</td>
         <td class="num ${tone(r.chg)}">${pct(r.chg)}</td>
@@ -251,7 +314,7 @@ function screener() {
         <td class="num">${r.it.limit ?? "—"}</td>
         <td class="num">${gp(r.cap)}</td>
         <td class="num" title="${exact(r.be)}">${gp(r.be)}</td>
-        <td>${r.sig !== "hold" ? chip(r.sig) : ""}</td></tr>`).join("") || `<tr><td colspan="9" class="muted">No items match these filters.</td></tr>`}
+        <td>${r.sig !== "hold" ? chip(r.sig) : ""}</td></tr>`).join("") || `<tr><td colspan="10" class="muted">No items match these filters.</td></tr>`}
       </tbody></table></div>
     <p class="note" style="margin-top:8px">${total.toLocaleString()} items match${total > 150 && !ui.showAll ? ` · showing 150 · <a href="#" data-act="showall">show all</a>` : ""}</p>`;
 }
@@ -286,7 +349,7 @@ function itemView(arg) {
       <div class="row" style="justify-content:space-between"><h3>Price history</h3>
         <div class="row">${["7d", "30d", "6m", "1y"].map(l => `<button data-act="lookback" data-l="${l}" ${ui.lookback === l ? 'class="primary"' : ""}>${l}</button>`).join("")}</div></div>
       <div id="chart"><p class="note">Loading history…</p></div>
-      <p class="note">Gold dashed line: baseline. Blue lines: your events. Green dots: your buys, red: your sells.</p>
+      <p class="note">Grey dashed line: baseline. Blue lines: your events. Green dots: your buys, red: your sells.</p>
     </div>
     <div class="grid-2" style="margin-top:16px">
       <div class="panel stack">
@@ -331,10 +394,10 @@ async function drawChart(id) {
   }
 }
 
-function svgChart(pts, { baseline, events, marks }) {
+function svgChart(pts, { baseline, events, marks = [], hlines = [], fmt = gp, label = "Price history" }) {
   const W = 800, H = 260, L = 64, Rr = 12, T = 14, B = 28;
   const t0 = pts[0].t, t1 = pts[pts.length - 1].t;
-  const vals = pts.map(p => p.p).concat(baseline > 0 ? [baseline] : []);
+  const vals = pts.map(p => p.p).concat(baseline > 0 ? [baseline] : [], hlines.map(h => h.v));
   let lo = Math.min(...vals), hi = Math.max(...vals);
   const padY = (hi - lo) * 0.08 || hi * 0.05; lo -= padY; hi += padY;
   const x = t => L + ((t - t0) / (t1 - t0 || 1)) * (W - L - Rr);
@@ -344,7 +407,7 @@ function svgChart(pts, { baseline, events, marks }) {
   let g = "";
   for (let i = 0; i <= 4; i++) {
     const v = lo + ((hi - lo) * i) / 4, yy = y(v).toFixed(1);
-    g += `<line class="grid" x1="${L}" x2="${W - Rr}" y1="${yy}" y2="${yy}"/><text x="${L - 6}" y="${yy}" text-anchor="end" dominant-baseline="middle">${gp(v)}</text>`;
+    g += `<line class="grid" x1="${L}" x2="${W - Rr}" y1="${yy}" y2="${yy}"/><text x="${L - 6}" y="${yy}" text-anchor="end" dominant-baseline="middle">${fmt(v)}</text>`;
   }
   for (let i = 0; i <= 4; i++) {
     const t = t0 + ((t1 - t0) * i) / 4, d = new Date(t * 1000);
@@ -355,7 +418,8 @@ function svgChart(pts, { baseline, events, marks }) {
   const bl = baseline > 0 && baseline >= lo && baseline <= hi ? `<line class="baseline" x1="${L}" x2="${W - Rr}" y1="${y(baseline).toFixed(1)}" y2="${y(baseline).toFixed(1)}"/>` : "";
   const mk = marks.filter(m => m.t >= t0 && m.t <= t1 + 86400 && m.p >= lo && m.p <= hi)
     .map(m => `<circle class="${m.kind}" cx="${x(Math.min(m.t, t1)).toFixed(1)}" cy="${y(m.p).toFixed(1)}" r="4.5"><title>${m.kind} ${gp(m.p)}</title></circle>`).join("");
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Price history">${g}<path class="area" d="${area}"/>${ev}${bl}<path class="price" d="${line}"/>${mk}</svg>`;
+  const hl = hlines.map(h => `<line class="hline ${h.cls}" x1="${L}" x2="${W - Rr}" y1="${y(h.v).toFixed(1)}" y2="${y(h.v).toFixed(1)}"/><text class="hline-label ${h.cls}" x="${W - Rr - 4}" y="${(y(h.v) - 4).toFixed(1)}" text-anchor="end">${esc(h.label)}</text>`).join("");
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">${g}<path class="area" d="${area}"/>${ev}${bl}${hl}<path class="price" d="${line}"/>${mk}</svg>`;
 }
 
 // ================================================================ BASKETS
@@ -399,14 +463,32 @@ function basketView(id) {
   return `
     <div class="view-head">
       <div><a href="#baskets">← Baskets</a><h2>${esc(b.name)}</h2><p>${esc(b.notes || (holdings ? "Items you own." : "Items you're watching."))}</p></div>
-      <div class="row">${ev ? chip(ev.signalFor("basket", b.id)) : ""}<button data-act="del-basket" data-id="${b.id}" class="danger">Delete basket</button></div>
+      <div class="row">${ev ? chip(ev.signalFor("basket", b.id)) : ""}<button data-act="edit-basket">Edit</button><button data-act="del-basket" data-id="${b.id}" class="danger">Delete basket</button></div>
     </div>
+    ${ui.editingBasket ? `<form data-form="edit-basket" data-b="${b.id}" class="panel stack" style="margin-bottom:16px">
+      <div class="row">
+        <label style="flex:1">Name<input name="name" required value="${esc(b.name)}"></label>
+        <label>Type<select name="kind"><option value="watch" ${!holdings ? "selected" : ""}>Watch</option><option value="holdings" ${holdings ? "selected" : ""}>Holdings</option></select></label>
+        <label>Index weighting<select name="weighting">
+          <option value="equal" ${basketWeighting(b) === "equal" ? "selected" : ""}>Equal — each item one vote</option>
+          <option value="value" ${basketWeighting(b) === "value" ? "selected" : ""}>By value — quantity × price</option></select></label>
+      </div>
+      <label>Notes<textarea name="notes">${esc(b.notes)}</textarea></label>
+      <div class="row"><button class="primary">Save</button><button type="button" data-act="edit-basket">Cancel</button></div>
+    </form>` : ""}
     ${wait && !market.error ? wait : ""}
     <div class="panel figures">
       ${fig("Index now", c.index?.toFixed(1) ?? "—", "100 = baseline", tone(c.index - 100))}
       ${fig("Index with what-if", ui.useWhatIf ? cw.index?.toFixed(1) ?? "—" : "off", "", tone(cw.index - 100))}
+      ${fig("Trend, last 7 days", trendFig(b), "Slope of the index, % per day")}
+      ${fig("Weighting", basketWeighting(b) === "equal" ? "Equal" : "By value")}
       ${fig("Priced items", `${c.covered ?? 0} / ${b.members.length}`)}
       ${holdings ? fig("Value now (mid)", gp(c.valueNow)) + fig("Value at baseline", gp(c.valueBase)) + fig("If sold now, after tax", gp(resolved.reduce((a, m) => a + C.netProceeds(nowSell(m.itemId) || 0, m.qty || 0, m.itemId), 0))) : ""}
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h3>Index, last 30 days</h3>
+      <div id="basket-chart">${live ? basketChart(b) : ""}</div>
+      <p class="note">Grey dashed line: 100 = baseline. Green: entry. Gold: target. Red: invalidation.</p>
     </div>
     <label class="row" style="margin:10px 0;align-items:center;gap:6px"><input type="checkbox" id="f-whatif" ${ui.useWhatIf ? "checked" : ""}> Use my what-if prices</label>
 
@@ -435,7 +517,16 @@ function basketView(id) {
       <label>Qty${holdings ? "" : " (optional)"}<input name="qty" inputmode="numeric" style="width:6em"></label>
       <button>Add</button>
     </form>
-    <p class="note">Items with a quantity are weighted by their baseline value in the index. Items without one count equally.</p>
+    <details style="margin-top:8px"><summary>Add several at once</summary>
+      <form data-form="add-members" data-b="${b.id}" class="stack" style="margin-top:8px">
+        <label>One item per line. Add a quantity after a comma if you want one.<textarea name="list" rows="6" placeholder="Torva full helm, 2&#10;Oathplate chest&#10;Ancestral hat"></textarea></label>
+        <div><button>Add all</button></div>
+      </form>
+      <p class="note">Or tick items in the Screener and use "Add selected".</p>
+    </details>
+    <p class="note">${basketWeighting(b) === "equal"
+      ? "Equal weighting: every item counts the same, so one big mover can't swamp the index. Change it with Edit."
+      : "By-value weighting: items count by quantity × price (blank quantity = 1), so the index tracks the money. Change it with Edit."}</p>
 
     ${holdings ? rotationPanel(b) : ""}
 
@@ -454,6 +545,30 @@ function basketView(id) {
       </div>`).join("") || `<p class="note">No rules for this basket yet.</p>`}
       <details class="panel"><summary>Add a custom rule</summary>${ruleForm(b)}</details>
     </section>`;
+}
+
+function trendFig(b) {
+  if (!indexMembers(b).length) return "—";
+  const t = basketTrend(b);
+  if (t == null) { loadBasketHistory(b); return loadingBaskets.has(b.id) ? "Loading…" : "—"; }
+  return `<span class="${tone(t)}">${pct(t, 2)}/day</span>`;
+}
+
+function basketChart(b) {
+  const s = basketSeries(b);
+  if (!s) {
+    if (failedHistory.has(b.id)) return `<p class="note danger">History didn't load. Refresh prices to retry.</p>`;
+    loadBasketHistory(b); return `<p class="note">Loading history for ${indexMembers(b).length} items…</p>`;
+  }
+  if (s.length < 2) return `<p class="note">Not enough history to draw the index.</p>`;
+  const hlines = state.theses.filter(t => t.basketId === b.id && t.status !== "closed").flatMap(t => [
+    t.entryIndex != null && { v: t.entryIndex, label: `Entry ${t.entryIndex}`, cls: "hl-entry" },
+    t.targetIndex != null && { v: t.targetIndex, label: `Target ${t.targetIndex}`, cls: "hl-target" },
+    t.invalidationIndex != null && { v: t.invalidationIndex, label: `Invalidation ${t.invalidationIndex}`, cls: "hl-invalid" },
+  ].filter(Boolean));
+  return svgChart(s.map(x => ({ t: x.t, p: x.index })), {
+    baseline: 100, events: state.events, hlines, fmt: v => v.toFixed(0), label: `${b.name} index`,
+  });
 }
 
 function thesisCard(t) {
@@ -511,7 +626,7 @@ function ruleForm(b) {
       <label>value<input name="value${i}" style="width:7em" ${i ? "" : "required"}></label>
       <label>and (for between)<input name="value2_${i}" style="width:7em"></label></div>`).join("")}
     <div><button class="primary">Add rule</button></div>
-    <p class="note">Trend needs the item's history loaded once (open its page). Basket trend isn't built yet.</p>
+    <p class="note">Trend = slope over the last 7 days, % per day (negative = falling). Item trend needs the item's page opened once; basket trend loads with the basket.</p>
   </form>`;
 }
 
@@ -712,9 +827,21 @@ function settings() {
 
 // ================================================================ ACTIONS
 const actions = {
-  reload() { series.clear(); loadMarket(); },
+  reload() { series.clear(); failedHistory.clear(); loadMarket(); },
   sort(el) { const k = el.dataset.key; ui.dir = ui.sort === k ? -ui.dir : 1; ui.sort = k; render(); },
   showall(el, e) { e.preventDefault(); ui.showAll = true; render(); },
+  "add-selected"() {
+    const b = state.baskets.find(x => x.id === document.getElementById("sel-basket").value);
+    if (!b) return;
+    let added = 0;
+    for (const id of ui.selected) {
+      if (b.members.some(m => m.itemId === id)) continue;
+      b.members.push({ itemId: id, name: nameOf(id), qty: null, note: "" }); added++;
+    }
+    ui.selected.clear(); persist();
+    setStatus(`Added ${added} item${added === 1 ? "" : "s"} to ${b.name}.`); render();
+  },
+  "clear-selected"() { ui.selected.clear(); render(); },
   "clear-filters"(el, e) {
     e.preventDefault();
     ui.direction = "all"; ui.minVol = 0; state.settings.minPrice = 0; persist(); render();
@@ -740,6 +867,7 @@ const actions = {
     state.theses = state.theses.filter(t => t.basketId !== el.dataset.id);
     persist(); location.hash = "#baskets";
   },
+  "edit-basket"() { ui.editingBasket = !ui.editingBasket; render(); },
   "rm-cash"(el) { state.cash.entries = state.cash.entries.filter(c => c.id !== el.dataset.id); persist(); render(); },
   "sell-holding"(el) { ui.sellingHolding = `${el.dataset.b}:${el.dataset.i}`; render(); },
   "cancel-holding"() { ui.sellingHolding = null; render(); },
@@ -797,6 +925,26 @@ const forms = {
   "new-basket"(f, d) {
     const b = { id: S.uid("b_"), name: d.name.trim(), kind: d.kind, members: [], notes: "" };
     state.baskets.push(b); persist(); location.hash = `#basket/${b.id}`;
+  },
+  "edit-basket"(f, d) {
+    const b = state.baskets.find(x => x.id === f.dataset.b);
+    Object.assign(b, { name: d.name.trim() || b.name, kind: d.kind, weighting: d.weighting, notes: d.notes });
+    ui.editingBasket = false; persist(); setStatus(`Saved “${b.name}”.`); render();
+  },
+  "add-members"(f, d) {
+    const b = state.baskets.find(x => x.id === f.dataset.b);
+    const added = [], missing = [];
+    for (const line of d.list.split(/\r?\n/).map(l => l.trim()).filter(Boolean)) {
+      const [name, qtyText] = line.split(/\s*,\s*(?=[\d.]+[kmb]?$)/i);
+      const it = itemByName(name);
+      if (!it) { missing.push(name); continue; }
+      if (b.members.some(m => m.itemId === it.id)) continue;
+      b.members.push({ itemId: it.id, name: it.name, qty: qtyText ? num(qtyText) : null, note: "" });
+      added.push(it.name);
+    }
+    persist();
+    setStatus(`Added ${added.length} item${added.length === 1 ? "" : "s"}.` + (missing.length ? ` Not found: ${missing.join(", ")}.` : ""), missing.length > 0);
+    render();
   },
   "add-member"(f, d) {
     const b = state.baskets.find(x => x.id === f.dataset.b), it = itemByName(d.name);
@@ -897,6 +1045,8 @@ view.addEventListener("change", e => {
     if (ui.sort === "pct") ui.dir = t.value === "up" ? -1 : 1; // biggest risers / biggest dips first
     render();
   }
+  else if (t.dataset.sel != null) { const id = Number(t.dataset.sel); t.checked ? ui.selected.add(id) : ui.selected.delete(id); render(); }
+  else if (t.id === "sel-all") { (ui.visibleIds || []).forEach(id => t.checked ? ui.selected.add(id) : ui.selected.delete(id)); render(); }
   else if (t.id === "f-whatif") { ui.useWhatIf = t.checked; render(); }
   else if (t.dataset.qty != null) {
     const b = state.baskets.find(x => x.id === route().arg);

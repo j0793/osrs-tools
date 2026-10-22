@@ -1,5 +1,28 @@
 # GE Market Analyzer — changelog
 
+## 0.4.0 — 2026-10-22
+
+Baskets get history, a trend, and are easier to build and manage.
+
+### Added
+- **Basket index chart**: the index over the last 30 days, with 100 = baseline, your events, and each open thesis's entry, target and invalidation lines.
+- **Basket trend**: slope of the index over the last 7 days, % per day. Usable in rules (e.g. "Raid demand trend ≤ 0 → Watch"). Baskets with a trend rule load their history at startup so signals work on every page.
+- **Edit basket**: rename, change type (Watch / Holdings), notes, and index weighting.
+- **Index weighting** per basket:
+  - *Equal*: geometric mean, every item one vote; one outlier can't swamp the index. Default for Watch baskets.
+  - *By value*: Σ qty × now ÷ Σ qty × baseline, blank qty counts as 1. Default for Holdings.
+- **Add several at once** in a basket: paste one item per line, optional `, qty`. Names that don't match are listed.
+- **Multi-select in the Screener**: tick items (or all shown) and add them to any basket in one go.
+- Tests for both weightings, the outlier case, and the index series.
+
+### Fixed
+- In baskets mixing items with and without a quantity, items without one were effectively ignored (weight 1 gp vs millions). Blank quantity now counts as 1 under By value.
+
+### Changed
+- Watch baskets now default to Equal weighting, so their index values will shift from v0.3.0. Switch to By value under Edit to get the old behaviour.
+- Baseline line on charts is grey, so it isn't confused with a thesis target.
+- A failed history load waits for Refresh prices instead of retrying on every screen update.
+
 ## 0.3.0 — 2026-10-22
 
 Screener no longer hides what you search for, and rotation handles structural vs cyclical items.

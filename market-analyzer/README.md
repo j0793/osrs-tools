@@ -14,7 +14,7 @@ Screener ──► every item vs baseline: % change, volume, buy limit, break-ev
    │
 Item page ──► history chart, recovery scenarios, log a buy
    │
-Baskets ──► your groups of related items → index (100 = baseline)
+Baskets ──► your groups of related items → index (100 = baseline), 30-day chart, 7-day trend
    │           └─ Thesis: dip type, expectation, entry / target / invalidation
    │                 └─ becomes rules → signals: Buy zone, Sell zone, Invalidated, Watch
    │           └─ Custom rules on any basket or item
@@ -31,7 +31,7 @@ Journal ──► each sell gets a review → stats by dip type and by cause
 
 | File | What it does |
 |---|---|
-| `js/calc.js` | All money math: GE tax, break-even, P/L, scenarios, rotation, basket index, trend, cash ledger, stats. Pure functions. |
+| `js/calc.js` | All money math: GE tax, break-even, P/L, scenarios, rotation, basket index and index history, trend, cash ledger, stats. Pure functions. |
 | `js/rules.js` | Thesis levels → rules, rule evaluation, signal priority. Pure functions. |
 | `js/api.js` | Every call to the price API, with field-name fallbacks and caching. |
 | `js/store.js` | Saved data schema, load/save, export/import, the starter liquidation list. |
@@ -46,7 +46,8 @@ Journal ──► each sell gets a review → stats by dip type and by cause
 - **Volume ×**: average hourly volume over the last 4 hours ÷ the baseline day's. 1.0 is normal; well above 1 on a falling item means dumping is still happening.
 - **Gold / 4h**: buy limit × price. How much you can actually put into one item per window.
 - **Break-even**: lowest sell price that returns your cost after the 2% tax (5m cap per item).
-- **Basket index**: 100 = baseline. Items with a quantity are weighted by baseline value; items without one count equally.
+- **Basket index**: 100 = baseline. *Equal* weighting = geometric mean of now ÷ baseline (every item one vote). *By value* = Σ qty × now ÷ Σ qty × baseline (blank qty = 1). Set per basket under Edit.
+- **Basket trend**: slope of the index over the last 7 days, % per day, from each member's 30-day history.
 - **Cash**: your manual entries plus every logged buy (minus) and sell (plus, after tax). Buys and sells aren't stored as cash entries; they're read from positions and trades each time, so the two can't disagree.
 - **Signal priority**: Invalidated beats Sell zone beats Buy zone beats Watch. No rule firing = Hold.
 

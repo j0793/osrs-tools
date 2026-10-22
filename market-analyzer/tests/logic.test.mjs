@@ -67,15 +67,36 @@ test("rotation with a fixed recovery for the holding (structural vs cyclical)", 
   assert.ok(fixed.edge > same.edge);
 });
 
-test("basket index: equal weight vs quantity weight", () => {
+test("basket index: equal (geometric) vs by value", () => {
   const now = { 1: 80, 2: 50 }, base = { 1: 100, 2: 100 };
-  const eq = C.basketIndex([{ itemId: 1 }, { itemId: 2 }], id => now[id], id => base[id]);
-  assert.equal(eq.index, 65);
-  const w = C.basketIndex([{ itemId: 1, qty: 3 }, { itemId: 2, qty: 1 }], id => now[id], id => base[id]);
+  const eq = C.basketIndex([{ itemId: 1 }, { itemId: 2 }], id => now[id], id => base[id], "equal");
+  assert.equal(eq.index.toFixed(2), (Math.sqrt(0.8 * 0.5) * 100).toFixed(2)); // 63.25
+  const w = C.basketIndex([{ itemId: 1, qty: 3 }, { itemId: 2, qty: 1 }], id => now[id], id => base[id], "value");
   assert.equal(w.index, 72.5);
   assert.equal(w.valueNow, 290);
-  const missing = C.basketIndex([{ itemId: 1 }, { itemId: 9 }], id => now[id], id => base[id]);
+  const blankQty = C.basketIndex([{ itemId: 1 }, { itemId: 2, qty: 1 }], id => now[id], id => base[id], "value");
+  assert.equal(blankQty.index, 65); // blank qty counts as 1, not ignored
+  const missing = C.basketIndex([{ itemId: 1 }, { itemId: 9 }], id => now[id], id => base[id], "equal");
   assert.equal(missing.covered, 1);
+});
+
+test("equal weighting keeps one outlier from swamping a gauge", () => {
+  // Tonalztics-style outlier: +212% next to four items up ~10%
+  const ratios = { 1: 3.12, 2: 1.1, 3: 1.1, 4: 1.1, 5: 1.1 };
+  const members = Object.keys(ratios).map(id => ({ itemId: Number(id) }));
+  const arith = C.basketIndex(members, id => ratios[id] * 100, () => 100, "value").index;   // 150.4
+  const geo = C.basketIndex(members, id => ratios[id] * 100, () => 100, "equal").index;     // ~136
+  assert.ok(geo < arith && geo > 110);
+});
+
+test("basket index series carries prices forward and starts when all members have data", () => {
+  const history = new Map([
+    [1, [{ t: 100, p: 100 }, { t: 300, p: 80 }]],
+    [2, [{ t: 200, p: 100 }, { t: 400, p: 120 }]],
+  ]);
+  const s = C.basketIndexSeries([{ itemId: 1 }, { itemId: 2 }], history, () => 100, "value");
+  assert.deepEqual(s.map(x => x.t), [200, 300, 400]); // starts at 200, when item 2 begins
+  assert.deepEqual(s.map(x => Math.round(x.index)), [100, 90, 100]);
 });
 
 test("trend is ~0 for a flat series and negative for a falling one", () => {

@@ -129,28 +129,55 @@ export function rotationScenario({ hold, target, fractions = [0.5, 0.75, 1], hol
 
 // ---------- Baskets ----------
 /**
- * Basket index: 100 = baseline. Members with a quantity are weighted by their
- * baseline value (qty × baseline price); members without one count equally.
+ * Basket index: 100 = baseline. Two weightings:
+ *   "equal" — every item gets one vote: the geometric mean of now/baseline.
+ *             One item tripling can't swamp the rest (good for a gauge like Raid demand).
+ *   "value" — weighted by money: Σ qty·now ÷ Σ qty·baseline (blank qty counts as 1).
+ *             Tracks what your actual position is worth (good for holdings or planned buys).
+ * valueNow / valueBase only count members that have a quantity, whichever weighting.
  * Returns null index if no member has both prices.
  */
-export function basketIndex(members, nowById, baseById) {
-  let wSum = 0, acc = 0, covered = 0, valueNow = 0, valueBase = 0;
+export function basketIndex(members, nowById, baseById, weighting = "value") {
+  let logSum = 0, now$ = 0, base$ = 0, covered = 0, valueNow = 0, valueBase = 0;
   for (const m of members) {
     const now = nowById(m.itemId), base = baseById(m.itemId);
     if (!(now > 0) || !(base > 0)) continue;
-    const w = m.qty > 0 ? m.qty * base : 1;
-    acc += w * (now / base);
-    wSum += w;
     covered++;
+    logSum += Math.log(now / base);
+    const q = m.qty > 0 ? m.qty : 1;
+    now$ += q * now; base$ += q * base;
     if (m.qty > 0) { valueNow += m.qty * now; valueBase += m.qty * base; }
   }
-  return {
-    index: wSum > 0 ? (acc / wSum) * 100 : null,
-    covered,
-    total: members.length,
-    valueNow,   // only counts members that have a quantity
-    valueBase,
-  };
+  let index = null;
+  if (covered) index = weighting === "equal" ? Math.exp(logSum / covered) * 100 : (now$ / base$) * 100;
+  return { index, covered, total: members.length, valueNow, valueBase };
+}
+
+/**
+ * Basket index over time from each member's price history.
+ * history: Map itemId → [{ t, p }] (any order). Each member's latest price at or
+ * before t is carried forward. The series starts once every member with history
+ * has a price, so the index doesn't jump when an item's data begins.
+ * Returns [{ t, index }].
+ */
+export function basketIndexSeries(members, history, baseById, weighting = "value") {
+  const withData = members.filter(m => (history.get(m.itemId) || []).some(x => x.p > 0));
+  if (!withData.length) return [];
+  const sorted = new Map(withData.map(m => [m.itemId, history.get(m.itemId).filter(x => x.p > 0).sort((a, b) => a.t - b.t)]));
+  const start = Math.max(...[...sorted.values()].map(pts => pts[0].t));
+  const times = [...new Set([...sorted.values()].flatMap(pts => pts.map(x => x.t)))].filter(t => t >= start).sort((a, b) => a - b);
+  const cursor = new Map(), last = new Map();
+  const out = [];
+  for (const t of times) {
+    for (const [id, pts] of sorted) {
+      let i = cursor.get(id) ?? 0;
+      while (i < pts.length && pts[i].t <= t) { last.set(id, pts[i].p); i++; }
+      cursor.set(id, i);
+    }
+    const { index } = basketIndex(withData, id => last.get(id), baseById, weighting);
+    if (index != null) out.push({ t, index });
+  }
+  return out;
 }
 
 // ---------- Series stats ----------
