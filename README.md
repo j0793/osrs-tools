@@ -8,6 +8,7 @@ Personal Old School RuneScape tools, hosted on GitHub Pages.
 osrs-tools/
 ├── index.html          Hub page: lists every tool from tools.json
 ├── changelog.html      Renders the repo or a tool's CHANGELOG.md (?tool=<id>)
+├── player.js           Hub player panel: skills, XP and gains from Wise Old Man
 ├── tools.json          Tool registry: name, folder, status, version, last update
 ├── CHANGELOG.md        Repo-wide changes
 ├── shared/theme.css    Shared look for the hub and every tool

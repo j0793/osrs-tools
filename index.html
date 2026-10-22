@@ -18,6 +18,63 @@
   .status-live { color: var(--up); }
   .status-pending-import { color: var(--muted); }
   .status-archived { color: var(--muted); }
+  /* ---------- player panel ---------- */
+  [hidden] { display: none !important; }
+  .player { margin-top: 24px; display: grid; gap: 16px; }
+  .p-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+  .p-head h2 { margin-top: 2px; }
+  .p-meta { font-size: var(--step--1); color: var(--muted); margin-top: 2px; }
+  .p-form { display: flex; gap: 8px; flex-wrap: wrap; }
+  .p-form input { width: 12em; }
+  .p-status { font-size: var(--step--1); color: var(--muted); min-height: 1.2em; margin: -8px 0 0; }
+  .p-status.err { color: var(--down); } .p-status.warn { color: var(--warn); } .p-status.ok { color: var(--up); }
+  .p-body { display: grid; gap: 14px; }
+  .p-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+  .sum { display: grid; gap: 2px; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius); border-top: 2px solid var(--gold); }
+  .sum b { font-family: var(--font-display); font-size: var(--step-2); font-weight: 600; line-height: 1.1; }
+  .sum small { font-size: var(--step--1); }
+  .p-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 4px 10px; background: var(--surface); font-size: var(--step--1); }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--gold); color: var(--surface); }
+  .p-controls label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--step--1); color: var(--muted); }
+  .p-controls select { font-size: var(--step--1); padding: 3px 6px; }
+  .p-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 176px), 1fr)); gap: 8px; }
+  .skill { --c: var(--muted); position: relative; min-width: 0; display: grid; gap: 6px; padding: 9px 10px 8px; border-radius: var(--radius);
+    background: var(--surface-2); border: 1px solid var(--line); border-left: 3px solid var(--c); }
+  .skill.cat-combat { --c: var(--down); } .skill.cat-gathering { --c: var(--up); }
+  .skill.cat-artisan { --c: var(--gold); } .skill.cat-support { --c: var(--info); }
+  .s-top { display: flex; align-items: center; gap: 7px; }
+  .s-top img { image-rendering: pixelated; flex: none; }
+  .s-name { font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .s-lvl { font-family: var(--font-display); font-size: 1.35rem; font-weight: 700; line-height: 1; }
+  .s-bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+  .s-bar i { display: block; height: 100%; background: var(--c); }
+  .s-foot { display: flex; justify-content: space-between; gap: 6px; font-size: 0.72rem; color: var(--muted); }
+  .s-gain { color: var(--up); white-space: nowrap; }
+  .s-up { font-style: normal; font-size: 0.72rem; color: var(--up); }
+  .s-xp { white-space: nowrap; }
+  .s-next { font-size: 0.72rem; color: var(--muted); opacity: .8; }
+  .skill.maxed { background: linear-gradient(var(--gold-soft), var(--surface-2) 70%); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); border-left-color: var(--gold); }
+  .skill.maxed .s-lvl { color: var(--gold); }
+  .skill.maxed .s-bar i { background: var(--gold); }
+  .p-empty { margin: 0; color: var(--muted); font-size: var(--step--1); }
+  .p-credit { margin: 0; font-size: var(--step--1); color: var(--muted); }
+  .legend { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+  .legend button { font-size: var(--step--1); padding: 3px 9px; border-radius: 999px; }
+  .legend button::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--muted)); }
+  .legend button.on { border-color: var(--c, var(--gold)); background: var(--surface-2); }
+  .legend [data-cat="combat"] { --c: var(--down); } .legend [data-cat="gathering"] { --c: var(--up); }
+  .legend [data-cat="artisan"] { --c: var(--gold); } .legend [data-cat="support"] { --c: var(--info); }
+  @media (max-width: 560px) {
+    .player { padding: 12px; }
+    .p-sum { grid-template-columns: 1fr 1fr; }
+    .p-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+    .skill { padding: 8px 8px 7px; }
+    .s-top img { display: none; }
+    .s-next { display: none; }
+  }
   footer { margin-top: 32px; font-size: var(--step--1); color: var(--muted); }
 </style>
 </head>
@@ -34,6 +91,39 @@
 
   <section class="tools" id="tools" aria-live="polite">
     <p class="muted">Loading tools…</p>
+  </section>
+
+  <section class="panel player" aria-labelledby="p-who">
+    <div class="p-head">
+      <div>
+        <span class="label">Player</span>
+        <h2 id="p-who">Player</h2>
+        <div class="p-meta" id="p-meta"></div>
+      </div>
+      <form class="p-form" id="p-form">
+        <input id="p-name" type="text" placeholder="OSRS username" autocomplete="off" aria-label="OSRS username">
+        <button class="primary" type="submit">Look up</button>
+        <button type="button" id="p-update" hidden title="Ask Wise Old Man to re-read the hiscores now">Update</button>
+        <button type="button" id="p-track" hidden>Start tracking</button>
+      </form>
+    </div>
+    <p class="p-status" id="p-status" aria-live="polite"></p>
+    <div class="p-body" id="p-body" hidden>
+      <div class="p-sum" id="p-sum"></div>
+      <div class="p-controls">
+        <div class="seg" role="group" aria-label="Gains period">
+          <button type="button" data-period="day">Day</button><button type="button" data-period="week">Week</button><button type="button" data-period="month">Month</button><button type="button" data-period="year">Year</button>
+        </div>
+        <div class="legend" role="group" aria-label="Skill type">
+          <button type="button" data-cat="all">All</button><button type="button" data-cat="combat">Combat</button><button type="button" data-cat="gathering">Gathering</button><button type="button" data-cat="artisan">Artisan</button><button type="button" data-cat="support">Support</button>
+        </div>
+        <label>Sort <select id="p-sort"><option value="game">Skill order</option><option value="level">Level</option><option value="xp">XP</option><option value="gained">Gained</option></select></label>
+        <label><input type="checkbox" id="p-gained"> Gained only</label>
+      </div>
+      <div class="p-grid" id="p-grid"></div>
+      <p class="p-empty" id="p-empty" hidden></p>
+      <p class="p-credit">Stats and gains from <a href="https://wiseoldman.net" rel="noopener">Wise Old Man</a>, which reads the hiscores when someone presses Update or the RuneLite plugin syncs. Icons from the OSRS Wiki.</p>
+    </div>
   </section>
 
   <footer>Prices in the market analyzer come from the OSRS Wiki Real-time Prices API.</footer>
@@ -81,5 +171,6 @@
         '<p class="muted">Could not load tools.json. Open this page through GitHub Pages or a local server, not as a file.</p>';
     });
 </script>
+<script type="module" src="player.js"></script>
 </body>
 </html>

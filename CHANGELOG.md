@@ -2,6 +2,13 @@
 
 Repo-wide changes: structure, shared styles, the hub page. Each tool keeps its own `CHANGELOG.md` for its own versions.
 
+## 2026-10-22 (hub player panel)
+
+### Added
+- Player panel on the hub, below the tools: every skill's level, XP, progress to the next level (or to 200m once 99), and XP gained over a Day, Week, Month or Year. Includes summary tiles (total level, total XP, gained, most gained), filters by skill type, a sort, and "Gained only".
+- Data from Wise Old Man (`player.js`). A lookup costs two requests, and each new period costs one more; periods are cached. **Update** asks Wise Old Man to re-read the hiscores, then waits 60 s before it can be used again.
+- The username, period, filter and sort are remembered in the browser (`osrs-tools-hub`). Defaults to Snooka.
+
 ## 2026-10-22 (imports)
 
 ### Added
