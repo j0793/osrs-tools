@@ -174,6 +174,30 @@ export function zScore(value, series) {
   return sd > 0 ? (value - m) / sd : null;
 }
 
+// ---------- Cash ----------
+/**
+ * Cash ledger: your manual entries (opening balance, deposits, withdrawals,
+ * corrections, holding sales) plus every logged buy fill and sell.
+ * Buys and sells are derived from positions and trades, never stored twice,
+ * so editing a fill or trade can't leave cash out of sync.
+ * Returns rows oldest → newest with a running balance.
+ */
+export function cashLedger({ entries = [], positions = [], trades = [] }) {
+  const rows = [
+    ...entries.map((e, i) => ({ date: e.date, at: e.at || "", kind: e.type, amount: e.amount, note: e.note || "", id: e.id, manual: true, order: 0, i })),
+    ...positions.flatMap(p => (p.fills || []).map((f, i) => ({
+      date: f.date, at: f.at || "", kind: "buy", amount: -f.qty * f.price, note: `${f.qty.toLocaleString()} × ${p.name}`, order: 1, i,
+    }))),
+    ...trades.map((t, i) => ({ date: t.closedAt, at: t.at || "", kind: "sell", amount: t.net, note: `${t.qty.toLocaleString()} × ${t.name}`, order: 2, i })),
+  ];
+  // Same day: by the time each was logged (`at`). Rows without a time (opening balances,
+  // data from v0.1) go first, then manual → buys → sells.
+  rows.sort((a, b) => a.date.localeCompare(b.date) || a.at.localeCompare(b.at) || a.order - b.order || a.i - b.i);
+  let balance = 0;
+  for (const r of rows) r.balance = balance += r.amount;
+  return { rows, balance };
+}
+
 // ---------- Journal stats ----------
 export function daysBetween(a, b) {
   return Math.max(0, Math.round((new Date(b) - new Date(a)) / 86400000));

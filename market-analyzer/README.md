@@ -20,6 +20,7 @@ Baskets ──► your groups of related items → index (100 = baseline)
    │           └─ Holdings basket + rotation calculator (your liquidation list)
    │
 Portfolio ──► open positions, P/L after tax at instant-sell price
+   │           └─ Cash ledger: opening + deposits/withdrawals + buys + sells + holding sales
    │
 Journal ──► each sell gets a review → stats by dip type and by cause
 ```
@@ -28,7 +29,7 @@ Journal ──► each sell gets a review → stats by dip type and by cause
 
 | File | What it does |
 |---|---|
-| `js/calc.js` | All money math: GE tax, break-even, P/L, scenarios, rotation, basket index, trend, stats. Pure functions. |
+| `js/calc.js` | All money math: GE tax, break-even, P/L, scenarios, rotation, basket index, trend, cash ledger, stats. Pure functions. |
 | `js/rules.js` | Thesis levels → rules, rule evaluation, signal priority. Pure functions. |
 | `js/api.js` | Every call to the price API, with field-name fallbacks and caching. |
 | `js/store.js` | Saved data schema, load/save, export/import, the starter liquidation list. |
@@ -44,6 +45,7 @@ Journal ──► each sell gets a review → stats by dip type and by cause
 - **Gold / 4h**: buy limit × price. How much you can actually put into one item per window.
 - **Break-even**: lowest sell price that returns your cost after the 2% tax (5m cap per item).
 - **Basket index**: 100 = baseline. Items with a quantity are weighted by baseline value; items without one count equally.
+- **Cash**: your manual entries plus every logged buy (minus) and sell (plus, after tax). Buys and sells aren't stored as cash entries; they're read from positions and trades each time, so the two can't disagree.
 - **Signal priority**: Invalidated beats Sell zone beats Buy zone beats Watch. No rule firing = Hold.
 
 ## Running the tests

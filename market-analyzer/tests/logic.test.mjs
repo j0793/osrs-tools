@@ -107,6 +107,20 @@ test("a condition with missing data never fires", () => {
   assert.equal(r.details[0].missing, true);
 });
 
+test("cash ledger: opening + buys + sells + holding sale, in date order", () => {
+  const { rows, balance } = C.cashLedger({
+    entries: [
+      { id: "o", date: "2026-10-22", type: "opening", amount: 900_000_000 },
+      { id: "h", date: "2026-10-24", type: "holding_sale", amount: 49_000_000 },
+    ],
+    positions: [{ name: "Torva platebody", fills: [{ date: "2026-10-22", qty: 1, price: 370_000_000 }] }],
+    trades: [{ name: "Torva platebody", qty: 1, net: 445_000_000, closedAt: "2026-10-23" }],
+  });
+  assert.deepEqual(rows.map(r => r.kind), ["opening", "buy", "sell", "holding_sale"]);
+  assert.equal(rows[1].balance, 530_000_000);
+  assert.equal(balance, 900_000_000 - 370_000_000 + 445_000_000 + 49_000_000);
+});
+
 test("hourly samples average into a baseline", () => {
   const s1 = new Map([[1, { avgHigh: 110, avgLow: 90, volHigh: 5, volLow: 5 }]]);
   const s2 = new Map([[1, { avgHigh: 130, avgLow: 110, volHigh: 10, volLow: 0 }]]);

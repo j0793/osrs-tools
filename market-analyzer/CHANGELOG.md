@@ -1,5 +1,25 @@
 # GE Market Analyzer — changelog
 
+## 0.2.0 — 2026-10-22
+
+Cash is now tracked from your logs instead of being a fixed number.
+
+### Added
+- **Cash ledger** (Portfolio → Cash): opening balance, added gold, gold taken out, and "Set balance to…" corrections, with a running balance.
+- Logged buys and sells flow into cash automatically. They're derived from your positions and trades, not stored twice, so cash can't drift out of sync.
+- **Sell from Holdings**: a Sell button on each holdings item logs the sale, lowers its quantity and adds the after-tax gold to cash.
+- Portfolio figures: Cash, Positions if sold now, Holdings if sold now, Total if all sold now.
+- Buy form shows cash available; logging a buy warns if cash goes below zero.
+- Test for the ledger's math and ordering.
+
+### Changed
+- Every new fill, sell and cash entry records the time it was logged, so same-day rows stay in the order they happened.
+- Holdings with quantity 0 (sold out) stay listed for the record but are left out of the basket index.
+- Settings no longer has a capital field.
+
+### Migration
+- Saved data moves from schema 1 to 2 on first load. The old capital setting becomes an opening-balance entry dated before your first logged buy. Older exports still import.
+
 ## 0.1.0 — 2026-10-22
 
 First scaffold. Logic and flow are in place for review; expect rough edges.

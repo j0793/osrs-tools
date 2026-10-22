@@ -13,7 +13,7 @@ import * as S from "./store.js";
 // ---------------------------------------------------------------- state
 let state = S.hasSaved() ? S.load() : S.starterState();
 const persist = () => { if (!S.save(state)) setStatus("Could not save — browser storage is full or blocked.", true); };
-if (!S.hasSaved()) persist();
+persist(); // saves the starter data on first run, or the upgraded data after a schema migration
 
 const market = {
   items: [], byId: new Map(), byName: new Map(),
@@ -123,7 +123,8 @@ function itemByName(name) {
 // ---------------------------------------------------------------- rules context
 function basketCalc(b, opts = {}) {
   const priceFn = opts.whatIf ? priceForIndex : nowMid;
-  return C.basketIndex(b.members.filter(m => m.itemId != null), priceFn, basePrice);
+  // qty 0 = sold out of (kept for the record), left out of the index; blank qty = unweighted member
+  return C.basketIndex(b.members.filter(m => m.itemId != null && m.qty !== 0), priceFn, basePrice);
 }
 function openPosition(itemId) { return state.positions.find(p => p.itemId === itemId && p.qty > 0); }
 
@@ -170,7 +171,7 @@ function render() {
   view.innerHTML = (views[name] || screener)(arg);
   if (name === "item") drawChart(Number(arg));
 }
-window.addEventListener("hashchange", () => { ui.sellingId = null; render(); window.scrollTo(0, 0); });
+window.addEventListener("hashchange", () => { ui.sellingId = null; ui.sellingHolding = null; render(); window.scrollTo(0, 0); });
 
 function needsPrices() {
   if (market.loading || (!market.loadedAt && !market.error)) return `<div class="empty">Loading prices…</div>`;
@@ -289,7 +290,7 @@ function itemView(arg) {
           <label>Thesis<select name="thesis"><option value="">None</option>${state.theses.filter(t => t.status !== "closed").map(t => `<option value="${t.id}" ${pos?.thesisId === t.id ? "selected" : ""}>${esc(t.title)}</option>`).join("")}</select></label>
           <button class="primary">Log buy</button>
         </form>
-        <p class="note">Logging only records what you did in game. It doesn't place offers.</p>
+        <p class="note">Cash available: ${gp(cashNow())}. Logging only records what you did in game. It doesn't place offers.</p>
       </div>
     </div>`;
 }
@@ -403,7 +404,13 @@ function basketView(id) {
           <td class="num ${tone(C.pctChange(now, base))}">${pct(C.pctChange(now, base))}</td>
           <td class="num">${ok && state.whatIf[m.itemId] ? gp(state.whatIf[m.itemId]) : "—"}</td>
           <td class="num">${ok ? volRatio(m.itemId)?.toFixed(2) ?? "—" : "—"}</td>
-          <td><button data-act="rm-member" data-b="${b.id}" data-i="${i}" aria-label="Remove">✕</button></td></tr>`;
+          <td class="row" style="flex-wrap:nowrap">${holdings && ok && m.qty > 0 ? `<button data-act="sell-holding" data-b="${b.id}" data-i="${i}">Sell</button>` : ""}<button data-act="rm-member" data-b="${b.id}" data-i="${i}" aria-label="Remove">✕</button></td></tr>
+          ${ui.sellingHolding === `${b.id}:${i}` ? `<tr><td colspan="8"><form data-form="sell-holding" data-b="${b.id}" data-i="${i}" class="row">
+            <label>Quantity<input name="qty" value="${m.qty}" inputmode="numeric" style="width:6em"></label>
+            <label>Price each<input name="price" value="${gp(nowSell(m.itemId))}" style="width:8em"></label>
+            <label>Date<input name="date" type="date" value="${today()}"></label>
+            <button class="primary">Log sale</button><button type="button" data-act="cancel-holding">Cancel</button>
+            <span class="note">After-tax gold goes to Portfolio → Cash.</span></form></td></tr>` : ""}`;
       }).join("") || `<tr><td colspan="8" class="muted">No items yet. Add some below.</td></tr>`}</tbody></table></div>
     <form data-form="add-member" data-b="${b.id}" class="row" style="margin-top:10px">
       <label>Add item<input name="name" list="item-names" required placeholder="Start typing an item name"></label>
@@ -532,14 +539,18 @@ function portfolio() {
     return { p, sell, r, thesis: state.theses.find(t => t.id === p.thesisId) };
   });
   const realized = state.trades.reduce((a, t) => a + t.pnl, 0);
-  const capital = state.settings.capital || 0;
+  const cash = cashNow();
+  const holdNet = live ? holdingsNet() : null;
   return `
-    <div class="view-head"><div><h2>Portfolio</h2><p>Open positions valued at the instant-sell price (what you'd get selling right now), after tax.</p></div></div>
+    <div class="view-head"><div><h2>Portfolio</h2><p>Open positions and holdings valued at the instant-sell price (what you'd get selling right now), after tax.</p></div></div>
     ${wait && !market.error ? wait : ""}
     <div class="panel figures">
-      ${fig("Capital", gp(capital))}${fig("Deployed", gp(cost))}${fig("Free", gp(capital - cost + realized))}
-      ${fig("Value if sold now", live ? gp(net) : "—")}${fig("Unrealized P/L", live ? gp(net - cost) : "—", "", tone(net - cost))}${fig("Realized P/L", gp(realized), "", tone(realized))}
+      ${fig("Cash", gp(cash), exact(cash), cash < 0 ? "down" : "")}${fig("In positions (cost)", gp(cost))}
+      ${fig("Positions if sold now", live ? gp(net) : "—")}${fig("Holdings if sold now", live ? gp(holdNet) : "—")}
+      ${fig("Total if all sold now", live ? gp(cash + net + holdNet) : "—")}
+      ${fig("Unrealized P/L", live ? gp(net - cost) : "—", "", tone(net - cost))}${fig("Realized P/L", gp(realized), "", tone(realized))}
     </div>
+    ${cash < 0 ? `<p class="note danger" style="margin-top:8px">Cash is negative: logged buys cost more than the gold recorded. Add a deposit or correct the balance below.</p>` : ""}
     <div class="table-wrap" style="margin-top:16px"><table>
       <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Avg cost</th><th class="num">Sell now</th><th class="num">Break-even</th><th class="num">P/L</th><th class="num">ROI</th><th class="num">Days</th><th>Thesis</th><th>Signal</th><th></th></tr></thead>
       <tbody>${rows.map(({ p, sell, r, thesis }) => `<tr>
@@ -557,7 +568,49 @@ function portfolio() {
           <label>Date<input name="date" type="date" value="${today()}"></label>
           <button class="primary">Log sell</button><button type="button" data-act="cancel-sell">Cancel</button></form></td></tr>` : ""}`).join("")
         || `<tr><td colspan="11" class="muted">No open positions. Log a buy from any item's page.</td></tr>`}</tbody></table></div>
-    <p class="note" style="margin-top:8px">Holdings you already own (like your liquidation list) live in <a href="#baskets">Baskets</a> as a Holdings basket.</p>`;
+    <p class="note" style="margin-top:8px">Holdings you already own (like your liquidation list) live in <a href="#baskets">Baskets</a> as a Holdings basket. Selling one there adds the gold here.</p>
+    ${cashPanel()}`;
+}
+
+function cashNow() {
+  return C.cashLedger({ entries: state.cash.entries, positions: state.positions, trades: state.trades }).balance;
+}
+
+function holdingsNet() {
+  return state.baskets.filter(b => b.kind === "holdings")
+    .flatMap(b => b.members)
+    .filter(m => m.itemId != null && m.qty > 0)
+    .reduce((a, m) => a + C.netProceeds(nowSell(m.itemId) || 0, m.qty, m.itemId), 0);
+}
+
+function cashPanel() {
+  const { rows, balance } = C.cashLedger({ entries: state.cash.entries, positions: state.positions, trades: state.trades });
+  const recent = [...rows].reverse();
+  return `<section class="stack" style="margin-top:24px">
+    <h3>Cash</h3>
+    <form data-form="cash" class="panel row">
+      <label>Change<select name="type">
+        <option value="deposit">${S.CASH_TYPES.deposit}</option>
+        <option value="withdraw">${S.CASH_TYPES.withdraw}</option>
+        <option value="set">Set balance to…</option>
+      </select></label>
+      <label>Amount<input name="amount" required placeholder="e.g. 50m" style="width:8em"></label>
+      <label>Date<input name="date" type="date" value="${today()}"></label>
+      <label style="flex:1">Note<input name="note" placeholder="Optional"></label>
+      <button class="primary">Save</button>
+    </form>
+    <p class="note">Buys and sells you log are added automatically. Use "Set balance to" when the app and your bank disagree; it records the difference as a correction.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th>Type</th><th>Detail</th><th class="num">Amount</th><th class="num">Balance</th><th></th></tr></thead>
+      <tbody>${recent.map(r => `<tr>
+        <td class="mono">${esc(r.date)}</td><td>${esc(S.CASH_TYPES[r.kind] || r.kind)}</td>
+        <td style="white-space:normal;min-width:12em">${esc(r.note)}</td>
+        <td class="num ${tone(r.amount)}" title="${exact(r.amount)}">${r.amount > 0 ? "+" : ""}${gp(r.amount)}</td>
+        <td class="num" title="${exact(r.balance)}">${gp(r.balance)}</td>
+        <td>${r.manual ? `<button data-act="rm-cash" data-id="${r.id}" aria-label="Delete entry">✕</button>` : ""}</td></tr>`).join("")
+        || `<tr><td colspan="6" class="muted">No cash recorded yet. Add your starting gold above.</td></tr>`}</tbody></table></div>
+    <p class="note">Balance now: ${exact(balance)}</p>
+  </section>`;
 }
 
 // ================================================================ JOURNAL
@@ -618,8 +671,8 @@ function settings() {
   return `
     <div class="view-head"><div><h2>Settings</h2><p>Your data is saved in this browser only. Export it to back up or move to another device.</p></div></div>
     <div class="grid-2">
-      <form data-form="settings" class="panel stack"><h3>Numbers</h3>
-        <label>Trading capital<input name="capital" value="${gp(state.settings.capital)}"></label>
+      <form data-form="settings" class="panel stack"><h3>Baseline</h3>
+        <p class="note">Your gold is tracked in <a href="#portfolio">Portfolio → Cash</a>.</p>
         <label>Baseline = days before event<input name="days" type="number" min="0" max="30" value="${state.settings.baselineDaysBefore}"></label>
         <button class="primary">Save</button></form>
       <div class="panel stack"><h3>Backup</h3>
@@ -661,6 +714,9 @@ const actions = {
     state.theses = state.theses.filter(t => t.basketId !== el.dataset.id);
     persist(); location.hash = "#baskets";
   },
+  "rm-cash"(el) { state.cash.entries = state.cash.entries.filter(c => c.id !== el.dataset.id); persist(); render(); },
+  "sell-holding"(el) { ui.sellingHolding = `${el.dataset.b}:${el.dataset.i}`; render(); },
+  "cancel-holding"() { ui.sellingHolding = null; render(); },
   "rm-rule"(el) { state.rules = state.rules.filter(r => r.id !== el.dataset.id); persist(); render(); },
   sell(el) { ui.sellingId = el.dataset.id; render(); },
   "cancel-sell"() { ui.sellingId = null; render(); },
@@ -689,9 +745,13 @@ const forms = {
     let p = openPosition(id);
     if (!p) { p = { id: S.uid("p_"), itemId: id, name: nameOf(id), qty: 0, avgCost: 0, fills: [], openedAt: d.date || today(), thesisId: null, notes: "" }; state.positions.push(p); }
     Object.assign(p, C.addFill(p, qty, price));
-    p.fills.push({ date: d.date || today(), qty, price });
+    p.fills.push({ date: d.date || today(), at: new Date().toISOString(), qty, price });
     if (d.thesis) p.thesisId = d.thesis;
-    persist(); setStatus(`Logged buy: ${qty.toLocaleString()} × ${nameOf(id)} at ${gp(price)}.`); render();
+    persist();
+    const cash = cashNow();
+    setStatus(`Logged buy: ${qty.toLocaleString()} × ${nameOf(id)} at ${gp(price)}. Cash now ${gp(cash)}.` +
+      (cash < 0 ? " That's below zero — add a deposit or correct the balance in Portfolio." : ""), cash < 0);
+    render();
   },
   sell(f, d) {
     const p = state.positions.find(x => x.id === f.dataset.id);
@@ -701,7 +761,7 @@ const forms = {
     const thesis = state.theses.find(t => t.id === p.thesisId);
     state.trades.push({
       id: S.uid("t_"), positionId: p.id, itemId: p.itemId, name: p.name, ...r,
-      openedAt: p.openedAt, closedAt: d.date || today(), holdDays: C.daysBetween(p.openedAt, d.date || today()),
+      openedAt: p.openedAt, closedAt: d.date || today(), at: new Date().toISOString(), holdDays: C.daysBetween(p.openedAt, d.date || today()),
       thesisId: p.thesisId, dipType: thesis?.dipType || "unset", review: {},
     });
     p.qty -= qty;
@@ -754,8 +814,31 @@ const forms = {
     if (d.active) state.settings.activeEventId = e.id;
     persist(); d.active ? loadMarket() : render();
   },
+  cash(f, d) {
+    const amount = num(d.amount);
+    if (!(amount >= 0)) return setStatus("Enter an amount, e.g. 50m or 1.2b.", true);
+    const date = d.date || today();
+    if (d.type === "set") {
+      const diff = amount - cashNow();
+      if (diff === 0) return setStatus("Balance already matches.");
+      state.cash.entries.push({ id: S.uid("c_"), date, at: new Date().toISOString(), type: "adjust", amount: diff, note: d.note || `Set balance to ${gp(amount)}` });
+    } else {
+      state.cash.entries.push({ id: S.uid("c_"), date, at: new Date().toISOString(), type: d.type, amount: d.type === "withdraw" ? -amount : amount, note: d.note || "" });
+    }
+    persist(); setStatus(`Cash now ${gp(cashNow())}.`); render();
+  },
+  "sell-holding"(f, d) {
+    const b = state.baskets.find(x => x.id === f.dataset.b), m = b.members[Number(f.dataset.i)];
+    const qty = Math.min(num(d.qty), m.qty || 0), price = num(d.price);
+    if (!(qty > 0) || !(price > 0)) return setStatus("Enter a quantity and price.", true);
+    const net = C.netProceeds(price, qty, m.itemId);
+    state.cash.entries.push({ id: S.uid("c_"), date: d.date || today(), at: new Date().toISOString(), type: "holding_sale", amount: net,
+      note: `${qty} × ${m.name} at ${gp(price)} (tax ${gp(qty * C.geTax(price, m.itemId))})`, ref: { basketId: b.id, itemId: m.itemId } });
+    m.qty = (m.qty || 0) - qty;
+    ui.sellingHolding = null; persist();
+    setStatus(`Sold ${qty} × ${m.name}: +${gp(net)} after tax. Cash now ${gp(cashNow())}.`); render();
+  },
   settings(f, d) {
-    state.settings.capital = num(d.capital) || 0;
     const days = Math.max(0, Math.min(30, Number(d.days) || 0));
     const changed = days !== state.settings.baselineDaysBefore;
     state.settings.baselineDaysBefore = days;

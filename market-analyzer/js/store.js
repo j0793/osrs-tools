@@ -2,10 +2,22 @@
 // Nothing is sent anywhere. Use Export / Import (Settings) to back up or
 // move your data to another device.
 //
-// Schema v1 — bump SCHEMA_VERSION and add a step to migrate() when it changes.
+// Schema v2 — bump SCHEMA_VERSION and add a step to migrate() when it changes.
+// v1 → v2: the fixed `settings.capital` number became a cash ledger (`cash.entries`).
 
 const KEY = "osrs-market-analyzer";
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
+
+/** Cash movement types. Buys and sells are added automatically from your logs. */
+export const CASH_TYPES = {
+  opening: "Opening balance",
+  deposit: "Added gold",
+  withdraw: "Took gold out",
+  adjust: "Correction",
+  holding_sale: "Sold a holding",
+  buy: "Buy",
+  sell: "Sell",
+};
 
 export const EVENT_TYPES = {
   major: "Major update",
@@ -45,8 +57,8 @@ export function emptyState() {
       baselineDaysBefore: 1,    // baseline = this many days before the event date
       minPrice: 1_000_000,      // screener default filters
       minVolumeRatio: 0,
-      capital: 900_000_000,
     },
+    cash: { entries: [] }, // { id, date, type (see CASH_TYPES), amount (signed gp), note, ref }
     events: [],     // { id, date, name, type, notes }
     baskets: [],    // { id, name, kind: "watch"|"holdings", members: [{ itemId, name, qty, note }], notes }
     theses: [],     // { id, basketId, eventId, title, dipType, expectation, reasoning,
@@ -64,8 +76,25 @@ export function uid(prefix = "") {
 }
 
 function migrate(s) {
-  // if (s.schema === 1) { ...transform...; s.schema = 2; }
+  if (!s.schema || s.schema < 2) {
+    const capital = s.settings?.capital;
+    s.cash = { entries: [] };
+    if (capital > 0) {
+      s.cash.entries.push({ id: uid("c_"), date: firstDate(s), type: "opening", amount: capital, note: "Carried over from the v0.1 capital setting" });
+    }
+    if (s.settings) delete s.settings.capital;
+    s.schema = 2;
+  }
   return s;
+}
+
+/** Earliest date in the data, so a migrated opening balance comes before every logged buy. */
+function firstDate(s) {
+  const dates = [
+    ...(s.positions || []).flatMap(p => (p.fills || []).map(f => f.date)),
+    ...(s.trades || []).map(t => t.openedAt),
+  ].filter(Boolean).sort();
+  return dates[0] || new Date().toISOString().slice(0, 10);
 }
 
 export function hasSaved() {
@@ -110,6 +139,7 @@ export function importJSON(text) {
 /** Seed data for a first run: your liquidation list as a holdings basket. Names resolve to item ids on load. */
 export function starterState() {
   const s = emptyState();
+  s.cash.entries.push({ id: uid("c_"), date: new Date().toISOString().slice(0, 10), type: "opening", amount: 900_000_000, note: "Starting gold — correct it in Portfolio" });
   s.baskets.push({
     id: uid("b_"),
     name: "Liquidation list",
