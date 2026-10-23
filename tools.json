@@ -4,8 +4,8 @@
       "id": "market-analyzer",
       "name": "GE Market Analyzer",
       "path": "market-analyzer/",
-      "status": "scaffold",
-      "version": "0.5.0",
+      "status": "live",
+      "version": "1.0.0",
       "updated": "2026-10-22",
       "description": "Screens Grand Exchange prices against update baselines, tracks positions, cash and P/L after tax, and reviews trade theses."
     },

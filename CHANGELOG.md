@@ -2,6 +2,18 @@
 
 Repo-wide changes: structure, shared styles, the hub page. Each tool keeps its own `CHANGELOG.md` for its own versions.
 
+## 2026-10-22 (market analyzer 1.0)
+
+### Changed
+- `market-analyzer` set to v1.0.0 and status `live`. See its changelog.
+
+## 2026-10-22 (readme)
+
+### Removed
+- "Publishing on GitHub Pages" section from the root README. `.nojekyll` is now listed under Structure instead.
+- Redirect instructions for the old `Combat-Achievement-Tracker` site from `ca-tracker/README.md`; the old repo is retired.
+- "after publishing" from the market analyzer README's first-run heading.
+
 ## 2026-10-22 (hub player panel)
 
 ### Added

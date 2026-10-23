@@ -1,5 +1,18 @@
 # GE Market Analyzer — changelog
 
+## 1.0.0 — 2026-10-22
+
+Out of scaffold. No code changes from 0.5.0; this marks the version that is published and checked.
+
+### Status
+- Every gap listed under 0.1.0 is closed: the basket trend shipped in 0.4.0, and the price API's field names were confirmed by the data check (all `ok: true`). Backups are handled by Export/Import in Settings.
+- Live data check passed on GitHub Pages; 18 logic tests pass.
+- Saved data stays at schema 3, so nothing migrates.
+
+### Planned
+- Daily brief: a scheduled summary of signals, basket moves and open theses.
+- Cyclical buys basket and thesis, when you're ready to buy.
+
 ## 0.5.0 — 2026-10-22
 
 Theses can bet on "no recovery", and selling a holding is now a graded decision.
