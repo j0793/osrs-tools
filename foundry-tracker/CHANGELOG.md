@@ -2,6 +2,18 @@
 
 Reconstructed from the build conversation ("OSRS smithing 99 giants foundry"). Times are US Eastern, from the message timestamps. Versions before 1.0.0 were assigned afterwards; the planner was a Claude artifact with no version numbers at the time. Each artifact update replaced the last on the same link, so earlier versions only exist as described here.
 
+## 1.3.0 — 2026-10-24
+
+The Alloy cards now agree with the Counter.
+
+### Fixed
+- Alloy cards always priced the cheapest mix (all warhammers, base price), so with platebodies at 16/12 the cards showed about −1.65m to 99 while Cost for more swords showed −9.47m. They now price swords from your armour by default, so the selected split matches the Counter exactly (16/12 platebodies: 72,341 gp per sword, −12.37m to 99).
+- Cost for more swords kept an old sword count (e.g. 239) after you changed the split or goal. Once you press **To goal**, the count stays synced to your goal through split, XP and goal changes until you type a number yourself.
+
+### Added
+- **Price swords by**: *Your armour* (gp per mithril and adamant bar from what's in the inventory, including the 2% rise, applied to each split) or *Cheapest mix*. The note under the cards states the per-bar prices being used. If the inventory doesn't have both metals, it falls back to the cheapest mix and says so.
+- Rune Treasury's Swords funded uses the same price per sword.
+
 ## 1.2.0 — 2026-10-24
 
 ### Added

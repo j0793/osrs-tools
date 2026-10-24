@@ -373,6 +373,11 @@ input[type=range].mist:focus-visible{outline:2px solid var(--yellow);outline-off
 .split dt{color:var(--muted)} .split dd{margin:0;text-align:right;font-family:var(--f-num);font-size:.92rem}
 .split dd.bad{color:var(--bad)} .split dd.good{color:var(--good)}
 .alnote{margin:0;font-size:.8rem;color:var(--muted)}
+.alprice{display:inline-flex;align-items:center;gap:8px;margin-left:auto}
+.aseg{display:inline-flex;border:1px solid var(--rim);border-radius:3px;overflow:hidden}
+.aseg button{font:600 .78rem var(--f-body);padding:4px 10px;border:0;background:var(--well);color:var(--muted);cursor:pointer}
+.aseg button+button{border-left:1px solid var(--rim)}
+.aseg button.on{background:linear-gradient(#ffe08a,#c8952f);color:#2b1a06}
 @media (max-width:560px){.splits{grid-template-columns:1fr;gap:8px}.split dl{grid-template-columns:auto 1fr auto 1fr;gap:1px 8px}}
 </style>
 </head>
@@ -432,7 +437,8 @@ input[type=range].mist:focus-visible{outline:2px solid var(--yellow);outline-off
 
   <!-- 0. alloy: bar split per sword -->
   <section class="panel alloy" aria-label="Bar split">
-    <div class="alhead"><h2 class="plaque">Alloy</h2><span class="alsub">Mithril / adamant bars per sword. Pick a split; everything below follows it.</span></div>
+    <div class="alhead"><h2 class="plaque">Alloy</h2><span class="alsub">Mithril / adamant bars per sword. Pick a split; everything below follows it.</span>
+      <span class="alprice"><span class="label">Price swords by</span><span class="aseg" role="group" aria-label="Price swords by"><button type="button" data-price="mine">Your armour</button><button type="button" data-price="cheap">Cheapest mix</button></span></span></div>
     <div class="splits" id="splits" role="radiogroup" aria-label="Bar split"></div>
     <p class="alnote" id="alnote"></p>
   </section>
@@ -533,7 +539,7 @@ var ROCKS=[
 
 /* ---------- state ---------- */
 function blank(){var o={};ITEMS.forEach(function(i){o[i.id]=0;});return o;}
-var S={tm:18,spt:4,showTrip:true,inv:blank(),slots:BASE_SLOTS,cheapN:2,costN:10,user:"",xp:7944614,goal:99,bars:100,lvl:94,nat:180,pick:"",trip:27,mist:0,mode:"single",mix:{},showAll:false,coal:67};
+var S={priceBy:"mine",costSynced:true,tm:18,spt:4,showTrip:true,inv:blank(),slots:BASE_SLOTS,cheapN:2,costN:10,user:"",xp:7944614,goal:99,bars:100,lvl:94,nat:180,pick:"",trip:27,mist:0,mode:"single",mix:{},showAll:false,coal:67};
 try{var saved=JSON.parse(localStorage.getItem("gfp-v2")||"null");if(saved&&typeof saved==="object"){for(var k in saved)S[k]=saved[k];S.inv=Object.assign(blank(),saved.inv||{});S.mix=saved.mix||{};delete S.have;}}catch(e){}
 function save(){try{localStorage.setItem("gfp-v2",JSON.stringify(S));}catch(e){}}
 function $(id){return document.getElementById(id);}
@@ -574,6 +580,12 @@ function cost(c){
   var b=0,x=0;
   ITEMS.forEach(function(i){var n=c[i.id]||0;b+=n*i.price;x+=Math.floor(n/i.stock)*run(i.price,i.stock)+run(i.price,n%i.stock);});
   return {base:b,real:x};
+}
+/* gp per bar for one metal, from the armour in the inventory (with the 2% rise); null if none of that metal */
+function perBar(c,metal){
+  var bars=0,x=0;
+  ITEMS.forEach(function(i){if(i.m!==metal)return;var n=c[i.id]||0;bars+=n*i.bars;x+=Math.floor(n/i.stock)*run(i.price,i.stock)+run(i.price,n%i.stock);});
+  return bars?x/bars:null;
 }
 function xpQ(q){q=Math.max(0,q);return (Math.floor(q*q/73)+Math.floor(1.5*q)+1)*30;}
 /* Metal score (OSRS Wiki): V = 10 x tier x bars / 28 for mithril (tier 4) and adamant (tier 5),
@@ -679,6 +691,7 @@ function paintReadout(){
   $("loadbox").innerHTML='<div class="qhead"><span class="label">Cheapest load</span><span class="stepper"><button class="sb" type="button" data-step="cheapN" data-d="-1" aria-label="One fewer sword">−</button><input id="cheapN" type="number" min="1" max="99" aria-label="Swords to load"><button class="sb" type="button" data-step="cheapN" data-d="1" aria-label="One more sword">+</button></span>'+
    '<span class="label">swords</span><button class="brass" type="button" id="loadCheap">Load cheapest</button></div>'+
    '<p class="qnote" id="cheapNote">'+cheapNote()+'</p>'+overflowNote();
+  if($("splits")&&typeof XPT!=="undefined")paintSplits();
   $("cheapN").value=S.cheapN;if($("costN"))$("costN").value=S.costN;
 }
 function costBlock(sw,spent){
@@ -724,7 +737,7 @@ $("top").addEventListener("click",function(e){
 });
 $("top").addEventListener("change",function(e){
   if(e.target.id==="cheapN"){S.cheapN=int(e.target.value,1,99);save();paintReadout();}
-  if(e.target.id==="costN"){S.costN=int(e.target.value,1,999);save();paintReadout();}
+  if(e.target.id==="costN"){S.costN=int(e.target.value,1,999);S.costSynced=false;save();paintReadout();}
 });
 
 /* ---------- rune alching ---------- */
@@ -774,7 +787,7 @@ function paintRune(){
    '<dt>Coal cost</dt><dd class="bad">−'+gp(totCoal*S.coal)+'</dd>'+
    '<dt>Smithing XP</dt><dd>'+gp(totXp)+'</dd>'+
    '<dt>Foundry swords funded</dt><dd>~'+gp(Math.floor(tot/swordCost()))+'</dd></dl>'+
-   '<p class="muted small">'+(rem?'The last '+rem+' bars use the '+(S.mode==="mix"?"best mix":"same item")+'. ':'')+'Coal is '+COAL_BF+' per bar at the Blast Furnace (half of 8). Ordan sells it at a flat '+gp(S.coal)+' gp, 100 per world. Swords funded uses the cheapest '+splitName(T_M)+' load, '+gp(swordCost())+' gp each.</p>';
+   '<p class="muted small">'+(rem?'The last '+rem+' bars use the '+(S.mode==="mix"?"best mix":"same item")+'. ':'')+'Coal is '+COAL_BF+' per bar at the Blast Furnace (half of 8). Ordan sells it at a flat '+gp(S.coal)+' gp, 100 per world. Swords funded prices each '+splitName(T_M)+' sword at '+gp(swordCost())+' gp ('+(useMine()?'your armour':'cheapest mix')+').</p>';
   document.querySelectorAll("[data-mode]").forEach(function(b){b.classList.toggle("on",b.dataset.mode===S.mode);});
   $("r_hint").textContent=S.mode==="mix"?"Top 3 by gp per bar for building a mix. Click to add one, right-click to take one out.":"Top 3 for "+trip+" bars, ranked by gp per inventory after natures and coal. Click one to smith it.";
   $("mixbox").hidden=S.mode!=="mix";
@@ -846,14 +859,25 @@ document.addEventListener("click",function(e){
   if(prop==="goal"){goalChanged();return;}
   if(prop==="spt"){paintGoal();return;}
   if(prop==="slots"){$("slots").value=S.slots;paintReadout();}
-  else if(prop==="cheapN"||prop==="costN")paintReadout();
+  else if(prop==="cheapN"||prop==="costN"){if(prop==="costN")S.costSynced=false;paintReadout();}
   else paintRune();
 });
 $("slots").addEventListener("input",function(e){if(e.target.value==="")return;S.slots=int(e.target.value,1,40);save();paintReadout();});
 $("slots").addEventListener("change",function(e){e.target.value=S.slots;});
 
 /* ---------- alloy: compare bar splits ---------- */
-function swordCost(tm){return cheapest(1,Infinity,tm).c;}
+/* cost of one sword at a split: priced from your armour (gp per bar of each metal in the inventory),
+   or the cheapest shop mix at base price */
+function useMine(){return S.priceBy!=="cheap"&&perBar(S.inv,"m")!=null&&perBar(S.inv,"a")!=null;}
+function swordCost(tm){
+  if(tm==null)tm=T_M;
+  if(useMine())return tm*perBar(S.inv,"m")+(CRUCIBLE-tm)*perBar(S.inv,"a");
+  return cheapest(1,Infinity,tm).c;
+}
+function costBasis(){
+  if(!useMine())return S.priceBy==="cheap"?"the cheapest shop mix (all warhammers) at base price":"the cheapest shop mix, since the inventory needs both mithril and adamant armour to price your own";
+  return "your armour: "+gp(perBar(S.inv,"m"))+" gp per mithril bar and "+gp(perBar(S.inv,"a"))+" gp per adamant bar, from what's in the inventory, including the 2% rise";
+}
 function paintSplits(){
   var left=Math.max(0,XPT[S.goal]-S.xp),rows=SPLITS.map(function(tm){
     var xp=splitXp(tm),c=swordCost(tm),net=2*xp-c,n=left?Math.ceil(left/xp):0;
@@ -875,11 +899,14 @@ function paintSplits(){
   var g=gcd(T_M,T_A);
   $("sub").innerHTML='<b>'+T_M+' mithril : '+T_A+' adamant</b> bars per sword ('+(T_M/g)+':'+(T_A/g)+') · metal score '+METAL+' · '+gp(XP)+' XP and '+gp(COINS)+' coins per perfect sword'+
     '<span class="shops">Armour from Aneirin\'s Armour (Prifddinas) and the Cam Torum Blacksmith · change the split in Alloy below</span>';
-  $("alnote").textContent="Cost is the cheapest shop mix for one sword at base price (before the 2% rise). XP and coins assume no mistakes and an average mould score of "+MOULD+
+  document.querySelectorAll("[data-price]").forEach(function(b){b.classList.toggle("on",b.dataset.price===(S.priceBy==="cheap"?"cheap":"mine"));});
+  $("alnote").textContent="Cost per sword uses "+costBasis()+". XP and coins assume no mistakes and an average mould score of "+MOULD+
     ". A higher metal score also makes the sword a little harder to finish. 12/16 is shown for comparison; 14/14 beats it on both XP and cost.";
 }
 $("splits").addEventListener("click",function(e){var b=e.target.closest("[data-tm]");if(!b)return;
-  setSplit(Number(b.dataset.tm));save();paintAll();});
+  setSplit(Number(b.dataset.tm));if(S.costSynced)S.costN=Math.max(1,Math.min(999,goalSwords()||1));save();paintAll();});
+document.querySelector(".alloy").addEventListener("click",function(e){var b=e.target.closest("[data-price]");if(!b)return;
+  S.priceBy=b.dataset.price;save();paintAll();});
 
 /* ---------- smithing goal + XP lookup ---------- */
 var XPT=[0,0];(function(){var pts=0;for(var l=1;l<99;l++){pts+=Math.floor(l+300*Math.pow(2,l/7));XPT[l+1]=Math.floor(pts/4);}})();
@@ -940,8 +967,8 @@ $("g_spt").addEventListener("input",function(e){if(e.target.value==="")return;S.
 $("g_spt").addEventListener("change",function(e){e.target.value=trip();});
 $("g_showtrip").addEventListener("change",function(e){S.showTrip=e.target.checked;save();paintGoal();});
 var goalStatus="";
-function syncCost(){S.costN=Math.max(1,Math.min(999,goalSwords()||1));save();paintReadout();}
-function goalChanged(){save();paintGoal();syncCost();}
+function syncCost(){S.costSynced=true;S.costN=Math.max(1,Math.min(999,goalSwords()||1));save();paintReadout();}
+function goalChanged(){save();paintGoal();if(S.costSynced)syncCost();}
 $("g_xp").addEventListener("input",function(e){if(e.target.value==="")return;S.xp=int(e.target.value,0,200000000);goalStatus="";goalChanged();});
 $("g_goal").addEventListener("input",function(e){if(e.target.value==="")return;S.goal=int(e.target.value,2,99);goalChanged();});
 $("g_user").addEventListener("input",function(e){S.user=e.target.value.slice(0,12);save();});
