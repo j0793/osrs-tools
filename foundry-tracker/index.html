@@ -345,6 +345,28 @@ input[type=range].mist:focus-visible{outline:2px solid var(--yellow);outline-off
 /* hub link (added on import into OSRS Tools) */
 .hublink{display:inline-block;margin:0 0 10px;font-size:.85rem;color:var(--muted);text-decoration:none}
 .hublink:hover{color:var(--yellow)}
+
+/* ---------- alloy (bar split) ---------- */
+.alloy{background:linear-gradient(#2a2119,#1d1710)}
+.alhead{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.alsub{font-size:.82rem;color:var(--muted)}
+.splits{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.split{display:grid;gap:6px;text-align:left;padding:10px 12px;border-radius:4px;cursor:pointer;color:var(--text);font:inherit;
+  background:var(--well);border:1px solid var(--line);box-shadow:inset 0 0 0 1px rgba(255,255,255,.03)}
+.split:hover{border-color:var(--rim)}
+.split.on{border-color:var(--yellow);box-shadow:inset 0 0 0 1px var(--yellow),0 0 12px rgba(255,255,0,.12)}
+.split .sh{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.split .ratio{font:600 1.5rem/1 var(--f-num);color:var(--yellow)}
+.split .stag{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.split .stag.best{color:var(--good)}
+.split .mix{display:flex;height:6px;border-radius:3px;overflow:hidden;background:#000}
+.split .mix i{display:block;height:100%}
+.split .mix .m{background:var(--mith)} .split .mix .a{background:var(--addy)}
+.split dl{display:grid;grid-template-columns:auto 1fr;gap:1px 10px;margin:0;font-size:.8rem}
+.split dt{color:var(--muted)} .split dd{margin:0;text-align:right;font-family:var(--f-num);font-size:.92rem}
+.split dd.bad{color:var(--bad)} .split dd.good{color:var(--good)}
+.alnote{margin:0;font-size:.8rem;color:var(--muted)}
+@media (max-width:560px){.splits{grid-template-columns:1fr;gap:8px}.split dl{grid-template-columns:auto 1fr auto 1fr;gap:1px 8px}}
 </style>
 </head>
 <body>
@@ -355,7 +377,7 @@ input[type=range].mist:focus-visible{outline:2px solid var(--yellow);outline-off
     <div class="plate">
       <span class="rivet" style="top:9px;left:9px"></span><span class="rivet" style="top:9px;right:9px"></span><span class="rivet" style="bottom:9px;left:9px"></span><span class="rivet" style="bottom:9px;right:9px"></span>
       <h1><span class="kicker">Giants' Foundry</span><span class="etch">Foundry Planner</span></h1>
-      <p class="sub">18 mithril + 10 adamant bars per sword · Aneirin's Armour (Prifddinas) and the Cam Torum Blacksmith</p>
+      <p class="sub"><span id="subSplit">18 mithril + 10 adamant</span> bars per sword · Aneirin's Armour (Prifddinas) and the Cam Torum Blacksmith</p>
     </div>
     <label class="field slotplate" for="slots"><span class="label">Inventory space</span>
       <span class="stepper"><button class="sb" type="button" data-step="slots" data-d="-1" aria-label="One less slot">−</button><input id="slots" type="number" min="1" max="40"><button class="sb" type="button" data-step="slots" data-d="1" aria-label="One more slot">+</button></span>
@@ -393,6 +415,13 @@ input[type=range].mist:focus-visible{outline:2px solid var(--yellow);outline-off
 
     <div class="goalbar" id="g_goalbar"></div>
     <p class="muted status" id="g_status"></p>
+  </section>
+
+  <!-- 0. alloy: bar split per sword -->
+  <section class="panel alloy" aria-label="Bar split">
+    <div class="alhead"><h2 class="plaque">Alloy</h2><span class="alsub">Mithril / adamant bars per sword. Pick a split; everything below follows it.</span></div>
+    <div class="splits" id="splits" role="radiogroup" aria-label="Bar split"></div>
+    <p class="alnote" id="alnote"></p>
   </section>
 
   <!-- 1. armory + counter -->
@@ -453,7 +482,8 @@ input[type=range].mist:focus-visible{outline:2px solid var(--yellow);outline-off
 <script>
 (function(){
 "use strict";
-var T_M=18,T_A=10,BASE_SLOTS=28,TRIP=4;
+var T_M=18,T_A=10,BASE_SLOTS=28,TRIP=4,CRUCIBLE=28;
+var SPLITS=[20,18,16,14,12]; /* mithril bars per sword; adamant is the rest of the 28 */
 
 /* ---------- data ---------- */
 var ITEMS=[
@@ -490,7 +520,7 @@ var ROCKS=[
 
 /* ---------- state ---------- */
 function blank(){var o={};ITEMS.forEach(function(i){o[i.id]=0;});return o;}
-var S={inv:blank(),slots:BASE_SLOTS,cheapN:2,costN:10,user:"",xp:7944614,goal:99,bars:100,lvl:94,nat:180,pick:"",trip:27,mist:0,mode:"single",mix:{},showAll:false,coal:67};
+var S={tm:18,inv:blank(),slots:BASE_SLOTS,cheapN:2,costN:10,user:"",xp:7944614,goal:99,bars:100,lvl:94,nat:180,pick:"",trip:27,mist:0,mode:"single",mix:{},showAll:false,coal:67};
 try{var saved=JSON.parse(localStorage.getItem("gfp-v2")||"null");if(saved&&typeof saved==="object"){for(var k in saved)S[k]=saved[k];S.inv=Object.assign(blank(),saved.inv||{});S.mix=saved.mix||{};delete S.have;}}catch(e){}
 function save(){try{localStorage.setItem("gfp-v2",JSON.stringify(S));}catch(e){}}
 function $(id){return document.getElementById(id);}
@@ -533,8 +563,18 @@ function cost(c){
   return {base:b,real:x};
 }
 function xpQ(q){q=Math.max(0,q);return (Math.floor(q*q/73)+Math.floor(1.5*q)+1)*30;}
-var Q_MAX=89+59,XP=xpQ(Q_MAX); /* 18/10 alloy + avg mould score with every mould */
-var COINS=XP*2;
+/* Metal score (OSRS Wiki): V = 10 x tier x bars / 28 for mithril (tier 4) and adamant (tier 5),
+   score = floor((floor(10*V1) + floor(10*V2) + floor(V1*V2)) / 10). Kept in integers to avoid float error. */
+function metalScore(tm){var ta=CRUCIBLE-tm;
+  return Math.floor((Math.floor(400*tm/CRUCIBLE)+Math.floor(500*ta/CRUCIBLE)+Math.floor(2000*tm*ta/(CRUCIBLE*CRUCIBLE)))/10);}
+var MOULD=59; /* average mould score with every mould unlocked */
+function splitXp(tm){return xpQ(metalScore(tm)+MOULD);}
+var METAL,Q_MAX,XP,COINS;
+function setSplit(tm){
+  if(SPLITS.indexOf(tm)<0)tm=18;
+  S.tm=tm;T_M=tm;T_A=CRUCIBLE-tm;METAL=metalScore(tm);Q_MAX=METAL+MOULD;XP=xpQ(Q_MAX);COINS=XP*2;
+}
+function splitName(tm){return tm+"/"+(CRUCIBLE-tm);}
 function itemsIn(c){var n=0;ITEMS.forEach(function(i){n+=c[i.id]||0;});return n;}
 
 /* cheapest mix of items for N swords that fits in the given slots (null if nothing fits) */
@@ -544,8 +584,8 @@ function options(metal,T,N){
   for(var b=0;b<=cap;b++){var w=(tot-4*b)/2;out.push({c:b*body.price+w*ham.price,items:b+w,b:b,w:w,h:0});}
   return out;
 }
-function cheapest(N,slots){
-  var M=options("m",T_M,N),A=options("a",T_A,N),best=null;
+function cheapest(N,slots,tm){
+  var tmm=tm==null?T_M:tm,M=options("m",tmm,N),A=options("a",CRUCIBLE-tmm,N),best=null;
   M.forEach(function(m){A.forEach(function(a){
     var items=m.items+a.items,c=m.c+a.c;if(items>slots)return;
     if(!best||c<best.c||(c===best.c&&items<best.items))best={m:m,a:a,c:c,items:items};});});
@@ -603,7 +643,8 @@ function paintReadout(){
   var coins=sw*COINS,net=coins-k.real,over=items-S.slots;
   var exact=sw>0&&m.bars===T_M*sw&&a.bars===T_A*sw;
   var packM=m.N<Math.floor(m.bars/T_M),packA=a.N<Math.floor(a.bars/T_A);
-  var pill=items===0?'<span class="pill warn">Empty</span>':exact?'<span class="pill good">Exactly 18/10, nothing spare</span>':sw?'<span class="pill good">18/10 reached</span>':'<span class="pill warn">Below 18/10</span>';
+  var nm=splitName(T_M);
+  var pill=items===0?'<span class="pill warn">Empty</span>':exact?'<span class="pill good">Exactly '+nm+', nothing spare</span>':sw?'<span class="pill good">'+nm+' reached</span>':'<span class="pill warn">Below '+nm+'</span>';
   if(packM||packA)pill+=' <span class="pill bad">Each sword needs one 2-bar '+(packM?"mith":"addy")+' item</span>';
   function spare(n){return n>0?'<small>+'+n+' spare</small>':'';}
   $("readout").innerHTML=
@@ -718,8 +759,8 @@ function paintRune(){
    '<dt>Coal needed</dt><dd>'+gp(totCoal)+'</dd>'+
    '<dt>Coal cost</dt><dd class="bad">−'+gp(totCoal*S.coal)+'</dd>'+
    '<dt>Smithing XP</dt><dd>'+gp(totXp)+'</dd>'+
-   '<dt>Foundry swords funded</dt><dd>~'+gp(Math.floor(tot/35540))+'</dd></dl>'+
-   '<p class="muted small">'+(rem?'The last '+rem+' bars use the '+(S.mode==="mix"?"best mix":"same item")+'. ':'')+'Coal is '+COAL_BF+' per bar at the Blast Furnace (half of 8). Ordan sells it at a flat '+gp(S.coal)+' gp, 100 per world. Swords funded uses the cheapest load, 35,540 gp each.</p>';
+   '<dt>Foundry swords funded</dt><dd>~'+gp(Math.floor(tot/swordCost()))+'</dd></dl>'+
+   '<p class="muted small">'+(rem?'The last '+rem+' bars use the '+(S.mode==="mix"?"best mix":"same item")+'. ':'')+'Coal is '+COAL_BF+' per bar at the Blast Furnace (half of 8). Ordan sells it at a flat '+gp(S.coal)+' gp, 100 per world. Swords funded uses the cheapest '+splitName(T_M)+' load, '+gp(swordCost())+' gp each.</p>';
   document.querySelectorAll("[data-mode]").forEach(function(b){b.classList.toggle("on",b.dataset.mode===S.mode);});
   $("r_hint").textContent=S.mode==="mix"?"Top 3 by gp per bar for building a mix. Click to add one, right-click to take one out.":"Top 3 for "+trip+" bars, ranked by gp per inventory after natures and coal. Click one to smith it.";
   $("mixbox").hidden=S.mode!=="mix";
@@ -796,6 +837,33 @@ document.addEventListener("click",function(e){
 $("slots").addEventListener("input",function(e){if(e.target.value==="")return;S.slots=int(e.target.value,1,40);save();paintReadout();});
 $("slots").addEventListener("change",function(e){e.target.value=S.slots;});
 
+/* ---------- alloy: compare bar splits ---------- */
+function swordCost(tm){return cheapest(1,Infinity,tm).c;}
+function paintSplits(){
+  var left=Math.max(0,XPT[S.goal]-S.xp),rows=SPLITS.map(function(tm){
+    var xp=splitXp(tm),c=swordCost(tm),net=2*xp-c,n=left?Math.ceil(left/xp):0;
+    return {tm:tm,metal:metalScore(tm),xp:xp,c:c,net:net,perXp:-net/xp,n:n,goal:n*net};});
+  var cheap=rows.reduce(function(a,b){return b.perXp<a.perXp?b:a;}),fast=rows.reduce(function(a,b){return b.xp>a.xp?b:a;});
+  $("splits").innerHTML=rows.map(function(r){
+    var ta=CRUCIBLE-r.tm,tag=r===cheap&&r===fast?'<span class="stag best">Best</span>':r===cheap?'<span class="stag best">Cheapest XP</span>':r===fast?'<span class="stag best">Most XP</span>':(r.tm===16||r.tm===12)?'<span class="stag">'+(r.tm===16?"4:3":"3:4")+'</span>':'<span class="stag"></span>';
+    return '<button type="button" class="split'+(r.tm===T_M?" on":"")+'" role="radio" aria-checked="'+(r.tm===T_M)+'" data-tm="'+r.tm+'">'+
+      '<span class="sh"><span class="ratio">'+splitName(r.tm)+'</span>'+tag+'</span>'+
+      '<span class="mix" aria-hidden="true"><i class="m" style="width:'+(100*r.tm/CRUCIBLE).toFixed(1)+'%"></i><i class="a" style="width:'+(100*ta/CRUCIBLE).toFixed(1)+'%"></i></span>'+
+      '<dl><dt>Metal score</dt><dd>'+r.metal+'</dd>'+
+      '<dt>XP / sword</dt><dd>'+gp(r.xp)+'</dd>'+
+      '<dt>Cost / sword</dt><dd>'+gp(r.c)+'</dd>'+
+      '<dt>Kovac pays</dt><dd>'+gp(2*r.xp)+'</dd>'+
+      '<dt>Net / sword</dt><dd class="'+(r.net<0?"bad":"good")+'">'+(r.net>0?"+":"")+gp(r.net)+'</dd>'+
+      '<dt>Net cost / XP</dt><dd>'+(r.perXp>0?r.perXp.toFixed(3)+' gp':'none')+'</dd>'+
+      (left?'<dt>Swords to '+S.goal+'</dt><dd>'+gp(r.n)+'</dd><dt>Net to '+S.goal+'</dt><dd class="'+(r.goal<0?"bad":"good")+'">'+(r.goal>0?"+":"")+gp(r.goal)+'</dd>':'')+
+      '</dl></button>';}).join("");
+  $("subSplit").textContent=T_M+" mithril + "+T_A+" adamant";
+  $("alnote").textContent="Cost is the cheapest shop mix for one sword at base price (before the 2% rise). XP and coins assume no mistakes and an average mould score of "+MOULD+
+    ". A higher metal score also makes the sword a little harder to finish. 12/16 is shown for comparison; 14/14 beats it on both XP and cost.";
+}
+$("splits").addEventListener("click",function(e){var b=e.target.closest("[data-tm]");if(!b)return;
+  setSplit(Number(b.dataset.tm));save();paintAll();});
+
 /* ---------- smithing goal + XP lookup ---------- */
 var XPT=[0,0];(function(){var pts=0;for(var l=1;l<99;l++){pts+=Math.floor(l+300*Math.pow(2,l/7));XPT[l+1]=Math.floor(pts/4);}})();
 function levelOf(xp){var l=1;while(l<99&&xp>=XPT[l+1])l++;return l;}
@@ -836,7 +904,8 @@ function paintGoal(){
   /* goal bar */
   var pg=goalXp<=xp?1:xp/goalXp;
   $("g_goalbar").innerHTML='<i style="width:'+(pg*100).toFixed(1)+'%"></i><span>'+(pg*100).toFixed(1)+'% of the way to level '+S.goal+'</span>';
-  $("g_status").textContent=goalStatus||"Swords use "+gp(XP)+" XP each (18/10, no mistakes, 10 quality lost per mistake). The sword count fills “Cost for” below; you can still change it there.";
+  $("g_status").textContent=goalStatus||"Swords use "+gp(XP)+" XP each ("+splitName(T_M)+", no mistakes, 10 quality lost per mistake). The sword count fills “Cost for” below; you can still change it there.";
+  if($("splits"))paintSplits();
   if(document.activeElement!==$("g_xp"))$("g_xp").value=xp;
   if(document.activeElement!==$("g_goal"))$("g_goal").value=S.goal;
   if(document.activeElement!==$("g_user"))$("g_user").value=S.user;
@@ -872,10 +941,12 @@ function lookup(){
 }
 
 /* ---------- start ---------- */
+setSplit(Number(S.tm)||18);
+function paintAll(){paintInv();paintReadout();paintRune();paintRocks();paintGoal();paintSplits();}
 buildInv();
 if(itemsIn(S.inv)===0){S.inv.m_body=8;S.inv.m_legs=2;S.inv.m_ham=3;S.inv.a_body=4;S.inv.a_legs=2;S.inv.a_ham=1;} /* example haul on first open */
 $("slots").value=S.slots;
-paintInv();paintReadout();paintRune();paintRocks();paintGoal();
+paintAll();
 })();
 </script>
 </body>

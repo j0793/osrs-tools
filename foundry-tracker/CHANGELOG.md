@@ -2,6 +2,31 @@
 
 Reconstructed from the build conversation ("OSRS smithing 99 giants foundry"). Times are US Eastern, from the message timestamps. Versions before 1.0.0 were assigned afterwards; the planner was a Claude artifact with no version numbers at the time. Each artifact update replaced the last on the same link, so earlier versions only exist as described here.
 
+## 1.1.0 — 2026-10-24
+
+Choose the mithril/adamant split instead of always using 18/10.
+
+### Added
+- **Alloy** panel under the furnace with five splits: 20/8, 18/10, 16/12 (4:3), 14/14 and 12/16 (3:4). Click one to use it.
+- Each card shows:
+  - metal score
+  - XP per sword and what Kovac pays
+  - cheapest cost per sword
+  - net gp per sword and net cost per XP
+  - swords and net gp to your goal level
+- Badges mark the split with the cheapest XP and the one with the most XP.
+- Metal score is worked out with the OSRS Wiki formula instead of a fixed 89: 20/8 = 83, 18/10 = 89, 16/12 = 93, 14/14 = 95, 12/16 = 94.
+
+### Changed
+- Everything follows the chosen split:
+  - the header line
+  - Swords in inventory and its "Exactly X/Y" check
+  - Load cheapest and the overload inventory
+  - Cost for more swords
+  - the goal's XP per sword, swords to level, and mistakes per trip
+  - Swords funded in the Rune Treasury, which used a fixed 35,540 gp
+- The chosen split is saved with your other settings. Existing saves start on 18/10, so nothing changes until you pick another.
+
 ## 1.0.0 — 2026-10-22
 
 Moved into OSRS Tools and hosted on GitHub Pages.

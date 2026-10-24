@@ -2,6 +2,11 @@
 
 Repo-wide changes: structure, shared styles, the hub page. Each tool keeps its own `CHANGELOG.md` for its own versions.
 
+## 2026-10-24
+
+### Changed
+- `foundry-tracker` updated to v1.1.0 (choose the mithril/adamant bar split). See its changelog.
+
 ## 2026-10-22 (market analyzer 1.0)
 
 ### Changed
