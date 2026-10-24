@@ -2,6 +2,17 @@
 
 Reconstructed from the build conversation ("OSRS smithing 99 giants foundry"). Times are US Eastern, from the message timestamps. Versions before 1.0.0 were assigned afterwards; the planner was a Claude artifact with no version numbers at the time. Each artifact update replaced the last on the same link, so earlier versions only exist as described here.
 
+## 1.2.0 — 2026-10-24
+
+### Added
+- **Swords per trip** stepper above the level bar, from 1 to 12, default 4. The trip segment on the bar, the zoomed XP/coins lanes and the "trip takes you to" line all use it.
+- **Show trip on the bar** toggle. It hides the trip segment, the zoom lens and the zoomed lanes; the level bar and the mistakes slider stay.
+- Both settings are saved.
+
+### Changed
+- The header now states the split as a ratio, with what it gives: e.g. "18 mithril : 10 adamant bars per sword (9:5) · metal score 89 · 15,690 XP and 31,380 coins per perfect sword", with the shops on a second line.
+- The mistakes slider scales with swords per trip: the max is 3 per sword, Fine is under 1 per sword, Bad under 2 per sword, then Blatant. At 4 swords that's the same 1–3 / 4–7 / 8+ as before. Mistakes above the new max are capped when you lower the trip.
+
 ## 1.1.0 — 2026-10-24
 
 Choose the mithril/adamant split instead of always using 18/10.

@@ -5,6 +5,7 @@ Repo-wide changes: structure, shared styles, the hub page. Each tool keeps its o
 ## 2026-10-24
 
 ### Changed
+- `foundry-tracker` updated to v1.2.0 (swords per trip, show/hide the trip on the level bar, ratio in the header). See its changelog.
 - `foundry-tracker` updated to v1.1.0 (choose the mithril/adamant bar split). See its changelog.
 
 ## 2026-10-22 (market analyzer 1.0)

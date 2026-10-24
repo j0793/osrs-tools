@@ -151,6 +151,11 @@ hr{border:0;border-top:1px solid #000;border-bottom:1px solid var(--rim);margin:
 .tile small{font-size:.74rem;color:var(--muted);margin-top:-4px}
 /* big level bar */
 .lvlbar{display:grid;gap:6px}
+.tripctl{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
+.tripctl .label{color:#ffb070}
+.tripctl input[type=number]{width:3.2em}
+.tripctl .tgl{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-size:.82rem;color:#c9a497;cursor:pointer}
+.tripctl .tgl input{accent-color:#5ff2ff;width:16px;height:16px}
 .lvlbar .cap{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;font-size:.85rem;color:var(--muted)}
 .lvlbar .cap b{color:var(--text);font:600 1rem var(--f-num)}
 .lvlbar .cap .lv{font:600 1.25rem var(--f-num);color:var(--yellow);text-shadow:1px 1px 0 #000}
@@ -270,6 +275,8 @@ input[type=range].mist:focus-visible{outline:2px solid var(--yellow);outline-off
 .plate .etch{font:600 clamp(2rem,5.6vw,3.3rem)/1 var(--f-num);letter-spacing:.1em;text-transform:uppercase;color:#4a4f55;
   text-shadow:0 1px 0 rgba(255,255,255,.55),0 -1px 0 rgba(0,0,0,.75),0 0 1px rgba(0,0,0,.4)}
 .plate .sub{margin-top:6px;font-size:.8rem;font-weight:600;color:#15181b;text-shadow:0 1px 0 rgba(255,255,255,.4)}
+.plate .sub b{font-weight:700;color:#000}
+.plate .sub .shops{display:block;font-weight:500;opacity:.85}
 .slotplate{position:relative;z-index:1;background:rgba(10,6,3,.72);border:1px solid #6a3414;border-radius:4px;padding:8px 10px;box-shadow:0 0 14px rgba(255,90,0,.25)}
 .slotplate .label{color:#ffb070}
 @media (max-width:560px){.plate{padding:14px 20px 12px;width:100%}.slotplate{width:100%}}
@@ -377,7 +384,7 @@ input[type=range].mist:focus-visible{outline:2px solid var(--yellow);outline-off
     <div class="plate">
       <span class="rivet" style="top:9px;left:9px"></span><span class="rivet" style="top:9px;right:9px"></span><span class="rivet" style="bottom:9px;left:9px"></span><span class="rivet" style="bottom:9px;right:9px"></span>
       <h1><span class="kicker">Giants' Foundry</span><span class="etch">Foundry Planner</span></h1>
-      <p class="sub"><span id="subSplit">18 mithril + 10 adamant</span> bars per sword · Aneirin's Armour (Prifddinas) and the Cam Torum Blacksmith</p>
+      <p class="sub" id="sub">18 mithril : 10 adamant bars per sword</p>
     </div>
     <label class="field slotplate" for="slots"><span class="label">Inventory space</span>
       <span class="stepper"><button class="sb" type="button" data-step="slots" data-d="-1" aria-label="One less slot">−</button><input id="slots" type="number" min="1" max="40"><button class="sb" type="button" data-step="slots" data-d="1" aria-label="One more slot">+</button></span>
@@ -397,6 +404,12 @@ input[type=range].mist:focus-visible{outline:2px solid var(--yellow);outline-off
     </div>
 
     <div class="lvlbar">
+      <div class="tripctl">
+        <span class="label">Trip</span>
+        <span class="stepper"><button class="sb" type="button" data-step="spt" data-d="-1" aria-label="One fewer sword per trip">−</button><input id="g_spt" type="number" min="1" max="12" aria-label="Swords per trip"><button class="sb" type="button" data-step="spt" data-d="1" aria-label="One more sword per trip">+</button></span>
+        <span class="label">swords</span>
+        <label class="tgl"><input type="checkbox" id="g_showtrip"> Show trip on the bar</label>
+      </div>
       <div class="cap" id="g_cap"></div>
       <div class="bigbar" id="g_bar"></div>
       <svg class="lens" id="g_lens" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><polygon points="0,0 0,0 100,10 0,10"/></svg>
@@ -407,8 +420,8 @@ input[type=range].mist:focus-visible{outline:2px solid var(--yellow);outline-off
     <div class="mslide">
       <div class="mval"><small>Mistakes per trip</small><span id="g_mn"></span></div>
       <div class="rangewrap">
-        <input type="range" class="mist" id="g_mist" min="0" max="12" step="1" aria-label="Mistakes per 4-sword trip">
-        <div class="ticks" aria-hidden="true"><span class="tp" style="left:0;transform:translateX(-12px)">Perfect</span><span class="tf" style="left:16.7%">Fine</span><span class="tb" style="left:45.8%">Bad</span><span class="tx" style="left:83.3%">Blatant</span></div>
+        <input type="range" class="mist" id="g_mist" min="0" max="12" step="1" aria-label="Mistakes per trip">
+        <div class="ticks" aria-hidden="true"><span class="tp" style="left:0;transform:translateX(-12px)">Perfect</span><span class="tf" id="tick_f" style="left:16.7%">Fine</span><span class="tb" id="tick_b" style="left:45.8%">Bad</span><span class="tx" style="left:83.3%">Blatant</span></div>
       </div>
       <div class="mread" id="g_mread"></div>
     </div>
@@ -482,7 +495,7 @@ input[type=range].mist:focus-visible{outline:2px solid var(--yellow);outline-off
 <script>
 (function(){
 "use strict";
-var T_M=18,T_A=10,BASE_SLOTS=28,TRIP=4,CRUCIBLE=28;
+var T_M=18,T_A=10,BASE_SLOTS=28,CRUCIBLE=28;
 var SPLITS=[20,18,16,14,12]; /* mithril bars per sword; adamant is the rest of the 28 */
 
 /* ---------- data ---------- */
@@ -520,7 +533,7 @@ var ROCKS=[
 
 /* ---------- state ---------- */
 function blank(){var o={};ITEMS.forEach(function(i){o[i.id]=0;});return o;}
-var S={tm:18,inv:blank(),slots:BASE_SLOTS,cheapN:2,costN:10,user:"",xp:7944614,goal:99,bars:100,lvl:94,nat:180,pick:"",trip:27,mist:0,mode:"single",mix:{},showAll:false,coal:67};
+var S={tm:18,spt:4,showTrip:true,inv:blank(),slots:BASE_SLOTS,cheapN:2,costN:10,user:"",xp:7944614,goal:99,bars:100,lvl:94,nat:180,pick:"",trip:27,mist:0,mode:"single",mix:{},showAll:false,coal:67};
 try{var saved=JSON.parse(localStorage.getItem("gfp-v2")||"null");if(saved&&typeof saved==="object"){for(var k in saved)S[k]=saved[k];S.inv=Object.assign(blank(),saved.inv||{});S.mix=saved.mix||{};delete S.have;}}catch(e){}
 function save(){try{localStorage.setItem("gfp-v2",JSON.stringify(S));}catch(e){}}
 function $(id){return document.getElementById(id);}
@@ -575,6 +588,7 @@ function setSplit(tm){
   S.tm=tm;T_M=tm;T_A=CRUCIBLE-tm;METAL=metalScore(tm);Q_MAX=METAL+MOULD;XP=xpQ(Q_MAX);COINS=XP*2;
 }
 function splitName(tm){return tm+"/"+(CRUCIBLE-tm);}
+function gcd(a,b){return b?gcd(b,a%b):a;}
 function itemsIn(c){var n=0;ITEMS.forEach(function(i){n+=c[i.id]||0;});return n;}
 
 /* cheapest mix of items for N swords that fits in the given slots (null if nothing fits) */
@@ -824,12 +838,13 @@ function paintRocks(){
 }
 
 /* ---------- shared steppers + slots ---------- */
-var LIM={goal:[2,99],slots:[1,40],cheapN:[1,99],costN:[1,999],r_bars:[0,100000],r_trip:[1,28],r_lvl:[85,99]};
+var LIM={spt:[1,12],goal:[2,99],slots:[1,40],cheapN:[1,99],costN:[1,999],r_bars:[0,100000],r_trip:[1,28],r_lvl:[85,99]};
 document.addEventListener("click",function(e){
   var b=e.target.closest("[data-step]");if(!b)return;
   var key=b.dataset.step,d=Number(b.dataset.d),lim=LIM[key],prop=key.indexOf("r_")===0?key.slice(2):key;
   S[prop]=int((Number(S[prop])||0)+d,lim[0],lim[1]);save();
   if(prop==="goal"){goalChanged();return;}
+  if(prop==="spt"){paintGoal();return;}
   if(prop==="slots"){$("slots").value=S.slots;paintReadout();}
   else if(prop==="cheapN"||prop==="costN")paintReadout();
   else paintRune();
@@ -857,7 +872,9 @@ function paintSplits(){
       '<dt>Net cost / XP</dt><dd>'+(r.perXp>0?r.perXp.toFixed(3)+' gp':'none')+'</dd>'+
       (left?'<dt>Swords to '+S.goal+'</dt><dd>'+gp(r.n)+'</dd><dt>Net to '+S.goal+'</dt><dd class="'+(r.goal<0?"bad":"good")+'">'+(r.goal>0?"+":"")+gp(r.goal)+'</dd>':'')+
       '</dl></button>';}).join("");
-  $("subSplit").textContent=T_M+" mithril + "+T_A+" adamant";
+  var g=gcd(T_M,T_A);
+  $("sub").innerHTML='<b>'+T_M+' mithril : '+T_A+' adamant</b> bars per sword ('+(T_M/g)+':'+(T_A/g)+') · metal score '+METAL+' · '+gp(XP)+' XP and '+gp(COINS)+' coins per perfect sword'+
+    '<span class="shops">Armour from Aneirin\'s Armour (Prifddinas) and the Cam Torum Blacksmith · change the split in Alloy below</span>';
   $("alnote").textContent="Cost is the cheapest shop mix for one sword at base price (before the 2% rise). XP and coins assume no mistakes and an average mould score of "+MOULD+
     ". A higher metal score also makes the sword a little harder to finish. 12/16 is shown for comparison; 14/14 beats it on both XP and cost.";
 }
@@ -869,14 +886,17 @@ var XPT=[0,0];(function(){var pts=0;for(var l=1;l<99;l++){pts+=Math.floor(l+300*
 function levelOf(xp){var l=1;while(l<99&&xp>=XPT[l+1])l++;return l;}
 function goalSwords(){return Math.max(0,Math.ceil((XPT[S.goal]-S.xp)/XP));}
 /* XP for one 4-sword trip with k mistakes (10 quality each), spread as evenly as possible */
-function tripXp(k){var t=0;for(var i=0;i<TRIP;i++){var m=Math.floor(k/TRIP)+(i<k%TRIP?1:0);t+=xpQ(Q_MAX-10*m);}return t;}
-var MIST_MAX=12;
-function tier(k){return k===0?["Perfect","p"]:k<=3?["Fine","f"]:k<=7?["Bad","b"]:["Blatant XP loss","x"];}
+function trip(){return int(S.spt,1,12);}
+function tripXp(k){var n=trip(),t=0;for(var i=0;i<n;i++){var m=Math.floor(k/n)+(i<k%n?1:0);t+=xpQ(Q_MAX-10*m);}return t;}
+function mistMax(){return 3*trip();} /* 3 mistakes per sword fills the slider */
+/* tiers per trip: Fine under 1 per sword, Bad under 2 per sword, then Blatant (4 swords: 1-3, 4-7, 8+) */
+function tier(k){var n=trip();return k===0?["Perfect","p"]:k<n?["Fine","f"]:k<2*n?["Bad","b"]:["Blatant XP loss","x"];}
 function paintGoal(){
   var xp=S.xp,lv=levelOf(xp),goalXp=XPT[S.goal],left=Math.max(0,goalXp-xp),sw=goalSwords();
   var nx=lv<99?XPT[lv+1]:XPT[99],lo=XPT[lv],span=Math.max(1,nx-lo),pn=lv<99?(xp-lo)/span:1;
-  var k=S.mist,full=TRIP*XP,tx=tripXp(k),loss=full-tx,ti=tier(k),fr=tx/full;
-  var fw=lv<99?Math.min(full/span,1-pn):0,after=xp+tx,al=levelOf(after);
+  var n=trip(),MIST_MAX=mistMax();S.mist=Math.min(S.mist,MIST_MAX);
+  var k=S.mist,full=n*XP,tx=tripXp(k),loss=full-tx,ti=tier(k),fr=tx/full,show=S.showTrip!==false;
+  var fw=show&&lv<99?Math.min(full/span,1-pn):0,after=xp+tx,al=levelOf(after);
   /* header tiles */
   $("g_lvl").textContent=lv;
   $("g_lvlsub").textContent=lv<99?gp(nx-xp)+" XP to "+(lv+1):"Maxed";
@@ -884,23 +904,28 @@ function paintGoal(){
   $("g_goalsub").textContent=left?gp(left)+" XP · ~"+gp(sw)+" swords":"Goal reached";
   /* big bar */
   $("g_cap").innerHTML=lv<99?'<span><span class="lv">'+lv+'</span> → <span class="lv">'+(lv+1)+'</span> &nbsp;<b>'+gp(nx-xp)+'</b> XP to go · <b>'+gp(Math.ceil((nx-xp)/XP))+'</b> swords</span>'+
-    '<span>One trip '+(after>=nx?'levels you to <b>'+al+'</b>':'takes you to <b>'+(100*(after-lo)/span).toFixed(1)+'%</b>')+'</span>':'<span><span class="lv">99</span> Maxed</span>';
+    (show?'<span>'+(n===1?'One sword':'A '+n+'-sword trip')+' '+(after>=nx?'levels you to <b>'+al+'</b>':'takes you to <b>'+(100*(after-lo)/span).toFixed(1)+'%</b>')+'</span>':''):'<span><span class="lv">99</span> Maxed</span>';
   $("g_bar").innerHTML='<div class="fill" style="width:'+(pn*100).toFixed(2)+'%"></div>'+
-    (fw>0?'<div class="tseg" style="left:'+(pn*100).toFixed(2)+'%;width:'+(fw*100).toFixed(2)+'%" title="One perfect trip: '+gp(full)+' XP"><div class="lane xp"><i style="width:'+(fr*100).toFixed(1)+'%"></i></div><div class="lane gp"><i style="width:'+(fr*100).toFixed(1)+'%"></i></div></div>':'')+
+    (fw>0?'<div class="tseg" style="left:'+(pn*100).toFixed(2)+'%;width:'+(fw*100).toFixed(2)+'%" title="One perfect '+n+'-sword trip: '+gp(full)+' XP"><div class="lane xp"><i style="width:'+(fr*100).toFixed(1)+'%"></i></div><div class="lane gp"><i style="width:'+(fr*100).toFixed(1)+'%"></i></div></div>':'')+
     '<span class="pct">'+(pn*100).toFixed(1)+'%</span>';
   var L=pn*100,R=(pn+Math.max(fw,.006))*100;
   $("g_lens").style.display=fw>0?"":"none";
   $("g_lens").querySelector("polygon").setAttribute("points",L.toFixed(2)+",0 "+R.toFixed(2)+",0 100,10 0,10");
+  $("g_zoom").hidden=!show;
   $("g_zoom").innerHTML=
    '<span class="zl">XP</span><div class="ztrack xp"><i style="width:'+(fr*100).toFixed(1)+'%"></i><span class="got">+'+gp(tx)+' XP</span>'+(loss?'<span class="lost">−'+gp(loss)+'</span>':'')+'</div>'+
    '<span class="zl">Coins</span><div class="ztrack gp"><i style="width:'+(fr*100).toFixed(1)+'%"></i><span class="got">+'+gp(2*tx)+' gp</span>'+(loss?'<span class="lost">−'+gp(2*loss)+'</span>':'')+'</div>'+
-   '<div class="zfoot"><span>One '+TRIP+'-sword trip, zoomed in. Striped red is what the mistakes cost.</span><span>Perfect: '+gp(full)+' XP · '+gp(2*full)+' gp</span></div>';
+   '<div class="zfoot"><span>'+(n===1?'One sword':'One '+n+'-sword trip')+', zoomed in. Striped red is what the mistakes cost.</span><span>Perfect: '+gp(full)+' XP · '+gp(2*full)+' gp</span></div>';
   /* slider */
+  $("g_mist").max=MIST_MAX;
   if(document.activeElement!==$("g_mist"))$("g_mist").value=k;
+  $("tick_f").hidden=n===1;$("tick_b").style.left=(100*(3*n-1)/2/MIST_MAX).toFixed(1)+"%";
+  if(document.activeElement!==$("g_spt"))$("g_spt").value=n;
+  $("g_showtrip").checked=show;
   $("g_mn").innerHTML='<span class="t'+ti[1]+'">'+(k===MIST_MAX?k+"+":k)+'</span>';
-  var swK=left?Math.ceil(left/(tx/TRIP)):0,extra=Math.max(0,swK-sw);
+  var swK=left?Math.ceil(left/(tx/n)):0,extra=Math.max(0,swK-sw);
   $("g_mread").innerHTML='<b class="t'+ti[1]+'">'+ti[0]+'</b><br>'+(k?'−'+gp(loss)+' XP · −'+gp(2*loss)+' gp ('+(100*loss/full).toFixed(1)+'%)':'Nothing lost')+
-    (k?'<span class="xtra">= '+(loss/XP).toFixed(2)+' perfect swords lost per trip'+(left?' · <b class="t'+ti[1]+'">+'+gp(extra)+'</b> extra swords to level '+S.goal:'')+'</span>':'');
+    (k?'<span class="xtra">= '+(loss/XP).toFixed(2)+' perfect swords lost per '+(n===1?'sword':'trip')+(left?' · <b class="t'+ti[1]+'">+'+gp(extra)+'</b> extra swords to level '+S.goal:'')+'</span>':'');
   /* goal bar */
   var pg=goalXp<=xp?1:xp/goalXp;
   $("g_goalbar").innerHTML='<i style="width:'+(pg*100).toFixed(1)+'%"></i><span>'+(pg*100).toFixed(1)+'% of the way to level '+S.goal+'</span>';
@@ -910,7 +935,10 @@ function paintGoal(){
   if(document.activeElement!==$("g_goal"))$("g_goal").value=S.goal;
   if(document.activeElement!==$("g_user"))$("g_user").value=S.user;
 }
-$("g_mist").addEventListener("input",function(e){S.mist=int(e.target.value,0,MIST_MAX);save();paintGoal();});
+$("g_mist").addEventListener("input",function(e){S.mist=int(e.target.value,0,mistMax());save();paintGoal();});
+$("g_spt").addEventListener("input",function(e){if(e.target.value==="")return;S.spt=int(e.target.value,1,12);save();paintGoal();});
+$("g_spt").addEventListener("change",function(e){e.target.value=trip();});
+$("g_showtrip").addEventListener("change",function(e){S.showTrip=e.target.checked;save();paintGoal();});
 var goalStatus="";
 function syncCost(){S.costN=Math.max(1,Math.min(999,goalSwords()||1));save();paintReadout();}
 function goalChanged(){save();paintGoal();syncCost();}
